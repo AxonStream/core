@@ -9,12 +9,6 @@ build/
 .next/
 out/
 
-# Development
-.env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
 
 # IDE
 .vscode/
@@ -59,12 +53,29 @@ jspm_packages/
 # Vercel
 .vercel/
 
-# Package tarballs (keep local for review)
-# dist-tarballs/
+# Package tarballs
+dist-tarballs/
+*.tgz
 
 # Temporary files
 *.tmp
 *.temp
+test-*.js
+temp-test/
+docs-setup.md
+finilizing.md
+env-examples.md
+SELF_HEALING_REVIEW.md
+
+# Environment files
+.env
+.env.local
+.env.jwt-keys
+
+# Build artifacts
+apps/api/dist/
+apps/api/keys/
+apps/api/build.log
 
 # Cache
 .cache/

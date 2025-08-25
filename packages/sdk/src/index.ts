@@ -32,9 +32,10 @@ export type {
   JwtPayload
 } from './core/client';
 
-// Embed functionality
-export { AxonEmbed, mount as mountAxonUI } from './embed';
-export type { EmbedConfig } from './embed';
+// Embed functionality - Temporarily disabled due to UI component dependency
+// TODO: Re-enable after fixing UI component class inheritance issue
+// export { AxonEmbed, mount as mountAxonUI } from './embed';
+// export type { EmbedConfig } from './embed';
 
 // Framework Adapters - Auto-detect and lazy-load
 export {
@@ -44,30 +45,31 @@ export {
 } from './adapters/index';
 export type { FrameworkAdapter } from './adapters/index';
 
-// UI Components - Complete AXONUI system
-export {
-  AxonChat,
-  AxonPresence,
-  AxonHITL,
-  AxonEmbed as AxonEmbedComponent,
-  AxonNotifications,
-  createChat,
-  createPresence,
-  createHITL,
-  createEmbed,
-  createNotifications,
-  createUI,
-  AxonUIBuilder,
-  themes,
-  getTheme
-} from './ui/index';
-export type {
-  ComponentConfig,
-  ChatConfig,
-  PresenceConfig,
-  HITLConfig,
-  EmbedConfig as UIEmbedConfig
-} from './ui/index';
+// UI Components - Temporarily disabled to fix class inheritance issue
+// TODO: Fix AxonUIComponent bundling issue where class extends value undefined
+// export {
+//   AxonChat,
+//   AxonPresence,
+//   AxonHITL,
+//   AxonEmbed as AxonEmbedComponent,
+//   AxonNotifications,
+//   createChat,
+//   createPresence,
+//   createHITL,
+//   createEmbed,
+//   createNotifications,
+//   createUI,
+//   AxonUIBuilder,
+//   themes,
+//   getTheme
+// } from './ui/index';
+// export type {
+//   ComponentConfig,
+//   ChatConfig,
+//   PresenceConfig,
+//   HITLConfig,
+//   EmbedConfig as UIEmbedConfig
+// } from './ui/index';
 
 // Enhanced factory function that matches REAL_PROJECT_PLAN.md  
 export function createAxonStream(config: { org: string; token: string; debug?: boolean }) {
@@ -125,17 +127,8 @@ export function createAxonStream(config: { org: string; token: string; debug?: b
   };
 }
 
-// Backward compatibility factory function 
 export { createAxonPulsClient };
-
-// Re-export everything for convenience
+export const version = '1.0.0';
 export * from './core/client';
-export * from './core/event-emitter';
 export * from './core/contracts';
 export * from './errors/index';
-
-// Default export
-export default {
-  createClient: createAxonPulsClient,
-  version: '1.0.0',
-};

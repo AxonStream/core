@@ -1,89 +1,96 @@
+
 import { defineConfig } from 'tsup'
 
+const FW_EXTERNAL = [
+  'react', 'react-dom',
+  'vue',
+  '@angular/core', '@angular/common',
+  'rxjs'
+]
+
 export default defineConfig([
-    // Core SDK build
-    {
-        entry: ['packages/sdk/src/index.ts'],
-        format: ['esm', 'cjs'],
-        dts: true,
-        outDir: 'packages/sdk/dist',
-        clean: true,
-        sourcemap: true,
-        minify: false,
-        splitting: true,
-        treeshake: true,
-        external: ['react', 'vue', '@angular/core'],
-    },
 
-    // Framework Adapters
-    {
-        entry: [
-            'packages/sdk/src/adapters/react.ts',
-            'packages/sdk/src/adapters/vue.ts',
-            'packages/sdk/src/adapters/angular.ts'
-        ],
-        format: ['esm', 'cjs'],
-        dts: true,
-        outDir: 'packages/sdk/dist/adapters',
-        clean: false,
-        sourcemap: true,
-        external: ['react', 'vue', '@angular/core'],
+  {
+    entry: {
+      // core
+      'index': 'packages/sdk/src/index.ts',
+      // adapters
+      'adapters/react': 'packages/sdk/src/adapters/react.ts',
+      'adapters/vue': 'packages/sdk/src/adapters/vue.ts',
+      'adapters/angular': 'packages/sdk/src/adapters/angular.ts',
+      // ui
+      'ui/index': 'packages/sdk/src/ui/index.ts',
+      // embed as a module (keep only if you export "./embed")
+      'embed/index': 'packages/sdk/src/embed.ts'
     },
+    outDir: 'packages/sdk/dist',
+    format: ['esm', 'cjs'],
+    dts: true,
+    target: 'es2022',
+    platform: 'neutral',
+    splitting: false,   // stable filenames (no hashed chunks)
+    sourcemap: false,   // keep tarball clean
+    minify: true,
+    treeshake: true,
+    clean: true,
+    external: FW_EXTERNAL
+  },
 
-    // UI Components
-    {
-        entry: ['packages/sdk/src/ui/index.ts'],
-        format: ['esm', 'cjs'],
-        dts: true,
-        outDir: 'packages/sdk/dist/ui',
-        clean: false,
-        sourcemap: true,
-    },
+  // ───────────────────────────────────────────────────────────
+  // CDN IIFE (script tag) — NOT exported via "exports"
+  // → packages/sdk/dist/cdn/axonstream.js
+  // ───────────────────────────────────────────────────────────
+  {
+    entry: { axonstream: 'packages/sdk/src/cdn.ts' },
+    outDir: 'packages/sdk/dist/cdn',
+    format: ['iife'],
+    dts: false,
+    globalName: 'AxonStream',
+    platform: 'browser',
+    target: 'es2020',
+    splitting: false,
+    sourcemap: false,
+    minify: true,
+    treeshake: true,
+    clean: false
+  },
 
-    // CDN Build (minified for browsers)
-    {
-        entry: ['packages/sdk/src/cdn.ts'],
-        format: ['iife'],
-        globalName: 'AxonStream',
-        outDir: 'packages/sdk/dist',
-        clean: false,
-        minify: true,
-        sourcemap: false,
-        outExtension: () => ({ js: '.min.js' }),
-    },
+  // ───────────────────────────────────────────────────────────
+  // React Hooks → packages/react-hooks/dist
+  // ───────────────────────────────────────────────────────────
+  {
+    entry: { index: 'packages/react-hooks/src/index.ts' },
+    outDir: 'packages/react-hooks/dist',
+    format: ['esm', 'cjs'],
+    dts: true,
+    target: 'es2022',
+    platform: 'neutral',
+    splitting: false,
+    sourcemap: false,
+    minify: true,
+    treeshake: true,
+    clean: true,
+    external: ['react', 'react-dom', '@axonstream/core'],
+    tsconfig: 'packages/react-hooks/tsconfig.json'
+  },
 
-    // Embed Helper
-    {
-        entry: ['packages/sdk/src/embed.ts'],
-        format: ['esm', 'cjs'],
-        outDir: 'packages/sdk/dist',
-        clean: false,
-        minify: true,
-    },
-
-    // React Hooks Package
-    {
-        entry: ['packages/react-hooks/src/index.ts'],
-        format: ['esm', 'cjs'],
-        dts: true,
-        outDir: 'packages/react-hooks/dist',
-        clean: true,
-        sourcemap: true,
-        external: ['react'],
-        // Build react-hooks after SDK is built
-        onSuccess: 'echo "React hooks built successfully"',
-    },
-
-    // CLI Package
-    {
-        entry: ['packages/cli/src/cli.ts'],
-        format: ['cjs'],
-        dts: true,
-        outDir: 'packages/cli/dist',
-        clean: true,
-        target: 'node16',
-        sourcemap: true,
-        shims: true,
-        external: ['@axonstream/core'],
-    }
+  // ───────────────────────────────────────────────────────────
+  // CLI (Node) → packages/cli/dist/cli.cjs
+  // ───────────────────────────────────────────────────────────
+  {
+    entry: { cli: 'packages/cli/src/cli.ts' },
+    outDir: 'packages/cli/dist',
+    format: ['cjs'],
+    dts: false,                     // CLIs don't ship .d.ts
+    target: 'node18',
+    platform: 'node',
+    splitting: false,
+    sourcemap: false,
+    minify: false,
+    clean: true,
+    shims: true,
+    banner: { js: '#!/usr/bin/env node' },
+    outExtension: () => ({ js: '.cjs' }),
+    external: ['@axonstream/core', 'commander', 'chalk', 'dotenv', 'jwt-decode']
+  }
 ])

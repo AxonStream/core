@@ -1,10 +1,10 @@
 import { Navigation, MainContent } from '../../components/navigation';
-import { CheckCircle, Copy, ExternalLink, Play, Terminal, Zap } from 'lucide-react';
+import { CheckCircle, Copy, ExternalLink, Play, Terminal, Zap, Package, Code, Layers, Rocket } from 'lucide-react';
 import Link from 'next/link';
 
 export const metadata = {
-  title: 'Quick Start Guide',
-  description: 'Get started with the AxonPuls Platform in minutes. Complete setup guide for developers.',
+  title: 'Quick Start Guide - @axonstream/core',
+  description: 'Get started with @axonstream/core in minutes. One package for everything you need.',
 };
 
 export default function QuickStartPage() {
@@ -19,266 +19,218 @@ export default function QuickStartPage() {
             <div className="mb-12">
               <div className="inline-flex items-center px-4 py-2 rounded-full bg-green-500/10 border border-green-500/20 mb-6">
                 <Zap className="w-4 h-4 text-green-400 mr-2" />
-                <span className="text-sm text-green-300 font-medium">Quick Start Guide</span>
+                <span className="text-sm text-green-300 font-medium">@axonstream/core • Quick Start</span>
               </div>
               <h1 className="text-4xl md:text-5xl font-bold text-white mb-6">
-                Get Started with AxonPuls Platform
+                Get Started with AxonStream Core
               </h1>
               <p className="text-xl text-gray-300 leading-relaxed">
-                Get up and running with the AxonPuls Real-Time Platform in minutes. This guide covers everything you need to start building with our enterprise-grade APIs.
+                Install one package and get everything you need for real-time applications. React, Vue, Angular, UI components, and more - all in one revolutionary package.
               </p>
             </div>
 
-            {/* Prerequisites */}
-            <div className="bg-gray-900/50 backdrop-blur-sm border border-gray-800 rounded-xl p-8 mb-8">
+            {/* One Command Installation */}
+            <div className="bg-gradient-to-r from-blue-900/20 to-purple-900/20 border border-blue-500/20 rounded-xl p-8 mb-8">
               <h2 className="text-2xl font-bold text-white mb-6 flex items-center">
-                <CheckCircle className="w-6 h-6 text-green-400 mr-3" />
-                Prerequisites
+                <Package className="w-6 h-6 text-blue-400 mr-3" />
+                One Command Installation
               </h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <h3 className="text-lg font-semibold text-white mb-3">Required</h3>
-                  <ul className="space-y-2 text-gray-300">
-                    <li className="flex items-center">
-                      <CheckCircle className="w-4 h-4 text-green-400 mr-2" />
-                      Node.js 18+ installed
-                    </li>
-                    <li className="flex items-center">
-                      <CheckCircle className="w-4 h-4 text-green-400 mr-2" />
-                      PostgreSQL database
-                    </li>
-                    <li className="flex items-center">
-                      <CheckCircle className="w-4 h-4 text-green-400 mr-2" />
-                      Redis server
-                    </li>
-                    <li className="flex items-center">
-                      <CheckCircle className="w-4 h-4 text-green-400 mr-2" />
-                      Basic TypeScript knowledge
-                    </li>
-                  </ul>
-                </div>
-                <div>
-                  <h3 className="text-lg font-semibold text-white mb-3">Recommended</h3>
-                  <ul className="space-y-2 text-gray-300">
-                    <li className="flex items-center">
-                      <CheckCircle className="w-4 h-4 text-blue-400 mr-2" />
-                      Docker & Docker Compose
-                    </li>
-                    <li className="flex items-center">
-                      <CheckCircle className="w-4 h-4 text-blue-400 mr-2" />
-                      REST API experience
-                    </li>
-                    <li className="flex items-center">
-                      <CheckCircle className="w-4 h-4 text-blue-400 mr-2" />
-                      WebSocket familiarity
-                    </li>
-                    <li className="flex items-center">
-                      <CheckCircle className="w-4 h-4 text-blue-400 mr-2" />
-                      Git version control
-                    </li>
-                  </ul>
-                </div>
+              <div className="bg-gray-900/50 border border-gray-700 rounded-lg p-6 mb-4">
+                <code className="text-green-400 font-mono text-lg">npm install @axonstream/core</code>
               </div>
+              <p className="text-gray-300">
+                That's it! One command installs the core SDK, React hooks, Vue composables, Angular services, UI components, and CDN helpers.
+              </p>
             </div>
 
-            {/* Step 1: Installation */}
-            <div className="bg-gray-900/50 backdrop-blur-sm border border-gray-800 rounded-xl p-8 mb-8">
-              <h2 className="text-2xl font-bold text-white mb-6 flex items-center">
-                <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-white font-bold text-sm mr-3">1</div>
-                Installation & Setup
-              </h2>
+            {/* Framework Examples */}
+            <div className="space-y-8">
 
-              <div className="space-y-6">
-                <div>
-                  <h3 className="text-lg font-semibold text-white mb-3">Clone the Repository</h3>
-                  <div className="bg-gray-800 rounded-lg p-4 relative group">
-                    <code className="text-green-400 font-mono text-sm">
-                      git clone https://github.com/your-org/AxonPuls-platform.git<br />
-                      cd AxonPuls-platform
-                    </code>
-                    <button className="absolute top-2 right-2 p-2 text-gray-400 hover:text-white opacity-0 group-hover:opacity-100 transition-opacity">
-                      <Copy className="w-4 h-4" />
-                    </button>
-                  </div>
+              {/* React Example */}
+              <div className="bg-gray-900/50 backdrop-blur-sm border border-gray-800 rounded-xl p-8">
+                <h2 className="text-2xl font-bold text-white mb-6 flex items-center">
+                  <Code className="w-6 h-6 text-cyan-400 mr-3" />
+                  React Integration
+                </h2>
+                <div className="bg-gray-950 rounded-lg p-4 mb-4">
+                  <code className="text-sm text-gray-300 font-mono">
+                    <span className="text-purple-400">import</span> <span className="text-blue-400">{'{ useAxonpuls }'}</span> <span className="text-purple-400">from</span> <span className="text-green-400">'@axonstream/core/react'</span>;<br /><br />
+                    <span className="text-purple-400">function</span> <span className="text-yellow-400">ChatApp</span>() {'{'}<br />
+                    &nbsp;&nbsp;<span className="text-purple-400">const</span> <span className="text-blue-400">axon</span> = <span className="text-yellow-400">useAxonpuls</span>({'{'}<br />
+                    &nbsp;&nbsp;&nbsp;&nbsp;org: <span className="text-green-400">'your-org'</span>,<br />
+                    &nbsp;&nbsp;&nbsp;&nbsp;token: <span className="text-green-400">'your-jwt-token'</span><br />
+                    &nbsp;&nbsp;{'}'});<br /><br />
+                    &nbsp;&nbsp;<span className="text-purple-400">return</span> (<br />
+                    &nbsp;&nbsp;&nbsp;&nbsp;<span className="text-gray-500">{'<div>'}</span>Real-time chat ready!<span className="text-gray-500">{'</div>'}</span><br />
+                    &nbsp;&nbsp;);<br />
+                    {'}'}
+                  </code>
                 </div>
-
-                <div>
-                  <h3 className="text-lg font-semibold text-white mb-3">Install Dependencies</h3>
-                  <div className="bg-gray-800 rounded-lg p-4 relative group">
-                    <code className="text-green-400 font-mono text-sm">
-                      npm install<br />
-                      # or<br />
-                      yarn install
-                    </code>
-                    <button className="absolute top-2 right-2 p-2 text-gray-400 hover:text-white opacity-0 group-hover:opacity-100 transition-opacity">
-                      <Copy className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-
-                <div>
-                  <h3 className="text-lg font-semibold text-white mb-3">Environment Configuration</h3>
-                  <div className="bg-gray-800 rounded-lg p-4 relative group">
-                    <code className="text-green-400 font-mono text-sm">
-                      cp apps/api/.env.example apps/api/.env<br />
-                      # Edit the .env file with your database credentials
-                    </code>
-                    <button className="absolute top-2 right-2 p-2 text-gray-400 hover:text-white opacity-0 group-hover:opacity-100 transition-opacity">
-                      <Copy className="w-4 h-4" />
-                    </button>
-                  </div>
+                <div className="flex items-center text-sm text-gray-400">
+                  <CheckCircle className="w-4 h-4 text-green-400 mr-2" />
+                  TypeScript support • Auto-reconnection • Event handling
                 </div>
               </div>
-            </div>
 
-            {/* Step 2: Database Setup */}
-            <div className="bg-gray-900/50 backdrop-blur-sm border border-gray-800 rounded-xl p-8 mb-8">
-              <h2 className="text-2xl font-bold text-white mb-6 flex items-center">
-                <div className="w-8 h-8 bg-purple-600 rounded-full flex items-center justify-center text-white font-bold text-sm mr-3">2</div>
-                Database Setup
-              </h2>
-
-              <div className="space-y-6">
-                <div>
-                  <h3 className="text-lg font-semibold text-white mb-3">Run Database Migrations</h3>
-                  <div className="bg-gray-800 rounded-lg p-4 relative group">
-                    <code className="text-green-400 font-mono text-sm">
-                      cd apps/api<br />
-                      npx prisma migrate dev<br />
-                      npx prisma generate
-                    </code>
-                    <button className="absolute top-2 right-2 p-2 text-gray-400 hover:text-white opacity-0 group-hover:opacity-100 transition-opacity">
-                      <Copy className="w-4 h-4" />
-                    </button>
-                  </div>
+              {/* Vue Example */}
+              <div className="bg-gray-900/50 backdrop-blur-sm border border-gray-800 rounded-xl p-8">
+                <h2 className="text-2xl font-bold text-white mb-6 flex items-center">
+                  <Layers className="w-6 h-6 text-green-400 mr-3" />
+                  Vue 3 Integration
+                </h2>
+                <div className="bg-gray-950 rounded-lg p-4 mb-4">
+                  <code className="text-sm text-gray-300 font-mono">
+                    <span className="text-purple-400">import</span> <span className="text-blue-400">{'{ useAxonpuls }'}</span> <span className="text-purple-400">from</span> <span className="text-green-400">'@axonstream/core/vue'</span>;<br /><br />
+                    <span className="text-purple-400">export default</span> <span className="text-purple-400">{'{'}</span><br />
+                    &nbsp;&nbsp;setup() {'{'}<br />
+                    &nbsp;&nbsp;&nbsp;&nbsp;<span className="text-purple-400">const</span> <span className="text-blue-400">axon</span> = <span className="text-yellow-400">useAxonpuls</span>({'{'}<br />
+                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;org: <span className="text-green-400">'your-org'</span>,<br />
+                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;token: <span className="text-green-400">'your-jwt-token'</span><br />
+                    &nbsp;&nbsp;&nbsp;&nbsp;{'}'});<br /><br />
+                    &nbsp;&nbsp;&nbsp;&nbsp;<span className="text-purple-400">return</span> {'{ axon }'};<br />
+                    &nbsp;&nbsp;{'}'}<br />
+                    {'}'}
+                  </code>
                 </div>
-
-                <div>
-                  <h3 className="text-lg font-semibold text-white mb-3">Seed Database (Optional)</h3>
-                  <div className="bg-gray-800 rounded-lg p-4 relative group">
-                    <code className="text-green-400 font-mono text-sm">
-                      npx prisma db seed
-                    </code>
-                    <button className="absolute top-2 right-2 p-2 text-gray-400 hover:text-white opacity-0 group-hover:opacity-100 transition-opacity">
-                      <Copy className="w-4 h-4" />
-                    </button>
-                  </div>
+                <div className="flex items-center text-sm text-gray-400">
+                  <CheckCircle className="w-4 h-4 text-green-400 mr-2" />
+                  Composition API • Reactive data • Vue 3 support
                 </div>
               </div>
-            </div>
 
-            {/* Step 3: Start the Platform */}
-            <div className="bg-gray-900/50 backdrop-blur-sm border border-gray-800 rounded-xl p-8 mb-8">
-              <h2 className="text-2xl font-bold text-white mb-6 flex items-center">
-                <div className="w-8 h-8 bg-green-600 rounded-full flex items-center justify-center text-white font-bold text-sm mr-3">3</div>
-                Start the Platform
-              </h2>
-
-              <div className="space-y-6">
-                <div>
-                  <h3 className="text-lg font-semibold text-white mb-3">Development Mode</h3>
-                  <div className="bg-gray-800 rounded-lg p-4 relative group">
-                    <code className="text-green-400 font-mono text-sm">
-                      # Start the API server<br />
-                      npm run dev --workspace=api<br /><br />
-                      # Start the documentation (in another terminal)<br />
-                      npm run dev --workspace=docs
-                    </code>
-                    <button className="absolute top-2 right-2 p-2 text-gray-400 hover:text-white opacity-0 group-hover:opacity-100 transition-opacity">
-                      <Copy className="w-4 h-4" />
-                    </button>
-                  </div>
+              {/* Angular Example */}
+              <div className="bg-gray-900/50 backdrop-blur-sm border border-gray-800 rounded-xl p-8">
+                <h2 className="text-2xl font-bold text-white mb-6 flex items-center">
+                  <Rocket className="w-6 h-6 text-red-400 mr-3" />
+                  Angular Integration
+                </h2>
+                <div className="bg-gray-950 rounded-lg p-4 mb-4">
+                  <code className="text-sm text-gray-300 font-mono">
+                    <span className="text-purple-400">import</span> <span className="text-blue-400">{'{ AxonStreamService }'}</span> <span className="text-purple-400">from</span> <span className="text-green-400">'@axonstream/core/angular'</span>;<br /><br />
+                    <span className="text-purple-400">@Injectable</span>({'{'}<br />
+                    &nbsp;&nbsp;providedIn: <span className="text-green-400">'root'</span><br />
+                    {'}'})<br />
+                    <span className="text-purple-400">export class</span> <span className="text-yellow-400">ChatService</span> {'{'}<br />
+                    &nbsp;&nbsp;<span className="text-purple-400">constructor</span>(<span className="text-purple-400">private</span> <span className="text-blue-400">axon</span>: <span className="text-yellow-400">AxonStreamService</span>) {'{'}<br />
+                    &nbsp;&nbsp;&nbsp;&nbsp;<span className="text-blue-400">this</span>.<span className="text-blue-400">axon</span>.<span className="text-yellow-400">connect</span>({'{'}<br />
+                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;org: <span className="text-green-400">'your-org'</span>,<br />
+                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;token: <span className="text-green-400">'your-jwt-token'</span><br />
+                    &nbsp;&nbsp;&nbsp;&nbsp;{'}'});<br />
+                    &nbsp;&nbsp;{'}'}<br />
+                    {'}'}
+                  </code>
                 </div>
-
-                <div className="bg-blue-900/20 border border-blue-800 rounded-lg p-4">
-                  <h4 className="text-blue-300 font-semibold mb-2">🚀 Platform URLs</h4>
-                  <ul className="space-y-1 text-sm text-gray-300">
-                    <li>• API Server: <code className="text-blue-400">http://localhost:3001</code></li>
-                    <li>• Swagger Docs: <code className="text-blue-400">http://localhost:3001/api/docs</code></li>
-                    <li>• Documentation: <code className="text-blue-400">http://localhost:3002</code></li>
-                    <li>• WebSocket: <code className="text-blue-400">ws://localhost:3001</code></li>
-                  </ul>
+                <div className="flex items-center text-sm text-gray-400">
+                  <CheckCircle className="w-4 h-4 text-green-400 mr-2" />
+                  Dependency injection • RxJS integration • Angular services
                 </div>
               </div>
-            </div>
 
-            {/* Step 4: First API Call */}
-            <div className="bg-gray-900/50 backdrop-blur-sm border border-gray-800 rounded-xl p-8 mb-8">
-              <h2 className="text-2xl font-bold text-white mb-6 flex items-center">
-                <div className="w-8 h-8 bg-orange-600 rounded-full flex items-center justify-center text-white font-bold text-sm mr-3">4</div>
-                Make Your First API Call
-              </h2>
-
-              <div className="space-y-6">
-                <div>
-                  <h3 className="text-lg font-semibold text-white mb-3">Test the API Status</h3>
-                  <div className="bg-gray-800 rounded-lg p-4 relative group">
-                    <code className="text-green-400 font-mono text-sm">
-                      curl http://localhost:3001/api/v1/status
-                    </code>
-                    <button className="absolute top-2 right-2 p-2 text-gray-400 hover:text-white opacity-0 group-hover:opacity-100 transition-opacity">
-                      <Copy className="w-4 h-4" />
-                    </button>
-                  </div>
+              {/* CDN Example */}
+              <div className="bg-gray-900/50 backdrop-blur-sm border border-gray-800 rounded-xl p-8">
+                <h2 className="text-2xl font-bold text-white mb-6 flex items-center">
+                  <Package className="w-6 h-6 text-orange-400 mr-3" />
+                  CDN Integration (No Build Required)
+                </h2>
+                <div className="bg-gray-950 rounded-lg p-4 mb-4">
+                  <code className="text-sm text-gray-300 font-mono">
+                    <span className="text-gray-500">{'<!-- Add to your HTML -->'}</span><br />
+                    <span className="text-purple-400">{'<script'}</span> <span className="text-blue-400">src</span>=<span className="text-green-400">"https://cdn.axonstream.ai/axonui.min.js"</span><span className="text-purple-400">{'></script>'}</span><br /><br />
+                    <span className="text-gray-500">{'<!-- Use in your JavaScript -->'}</span><br />
+                    <span className="text-purple-400">const</span> <span className="text-blue-400">axon</span> = <span className="text-purple-400">new</span> <span className="text-yellow-400">window</span>.<span className="text-yellow-400">AxonSDK</span>({'{'}<br />
+                    &nbsp;&nbsp;url: <span className="text-green-400">'wss://your-org.axonstream.ai'</span>,<br />
+                    &nbsp;&nbsp;token: <span className="text-green-400">'your-jwt-token'</span><br />
+                    {'}'});<br /><br />
+                    <span className="text-blue-400">await</span> <span className="text-blue-400">axon</span>.<span className="text-yellow-400">connect</span>();
+                  </code>
                 </div>
-
-                <div>
-                  <h3 className="text-lg font-semibold text-white mb-3">Expected Response</h3>
-                  <div className="bg-gray-800 rounded-lg p-4">
-                    <code className="text-blue-400 font-mono text-sm">
-                      {`{
-  "status": "ok",
-  "timestamp": "2025-08-06T01:30:00Z",
-  "version": "1.0.0",
-  "environment": "development"
-}`}
-                    </code>
-                  </div>
+                <div className="flex items-center text-sm text-gray-400">
+                  <CheckCircle className="w-4 h-4 text-green-400 mr-2" />
+                  No build tools • Global availability • Instant integration
                 </div>
               </div>
+
             </div>
 
             {/* Next Steps */}
-            <div className="bg-gradient-to-r from-blue-900/20 to-purple-900/20 border border-gray-700 rounded-xl p-8">
-              <h2 className="text-2xl font-bold text-white mb-6">🎉 You&apos;re All Set!</h2>
-              <p className="text-gray-300 mb-6">
-                Congratulations! You now have the AxonPuls Platform running locally. Here&apos;s what you can do next:
-              </p>
-
+            <div className="bg-gray-900/50 backdrop-blur-sm border border-gray-800 rounded-xl p-8 mt-12">
+              <h2 className="text-2xl font-bold text-white mb-6">What's Next?</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <Link href="/api-docs" className="group flex items-center p-4 bg-gray-800/50 border border-gray-700 rounded-lg hover:border-blue-500 transition-colors">
-                  <Terminal className="w-8 h-8 text-blue-400 mr-4" />
-                  <div>
-                    <h3 className="text-white font-semibold group-hover:text-blue-400 transition-colors">Explore API Documentation</h3>
-                    <p className="text-gray-400 text-sm">Complete API reference and examples</p>
-                  </div>
-                </Link>
+                <div>
+                  <h3 className="text-lg font-semibold text-white mb-3">Explore Features</h3>
+                  <ul className="space-y-2 text-gray-300">
+                    <li className="flex items-center">
+                      <CheckCircle className="w-4 h-4 text-blue-400 mr-2" />
+                      Real-time messaging
+                    </li>
+                    <li className="flex items-center">
+                      <CheckCircle className="w-4 h-4 text-blue-400 mr-2" />
+                      Presence indicators
+                    </li>
+                    <li className="flex items-center">
+                      <CheckCircle className="w-4 h-4 text-blue-400 mr-2" />
+                      Live cursors
+                    </li>
+                    <li className="flex items-center">
+                      <CheckCircle className="w-4 h-4 text-blue-400 mr-2" />
+                      Event subscriptions
+                    </li>
+                  </ul>
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-white mb-3">Resources</h3>
+                  <ul className="space-y-2 text-gray-300">
+                    <li>
+                      <a href="https://www.npmjs.com/package/@axonstream/core" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300 transition-colors">
+                        NPM Package →
+                      </a>
+                    </li>
+                    <li>
+                      <a href="https://github.com/AxonStream/core" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300 transition-colors">
+                        GitHub Repository →
+                      </a>
+                    </li>
+                    <li>
+                      <Link href="/api-docs" className="text-blue-400 hover:text-blue-300 transition-colors">
+                        API Documentation →
+                      </Link>
+                    </li>
+                    <li>
+                      <Link href="/testing" className="text-blue-400 hover:text-blue-300 transition-colors">
+                        Testing Interface →
+                      </Link>
+                    </li>
+                  </ul>
+                </div>
+              </div>
+            </div>
 
-                <Link href="/testing" className="group flex items-center p-4 bg-gray-800/50 border border-gray-700 rounded-lg hover:border-purple-500 transition-colors">
-                  <Play className="w-8 h-8 text-purple-400 mr-4" />
-                  <div>
-                    <h3 className="text-white font-semibold group-hover:text-purple-400 transition-colors">Try the Testing Interface</h3>
-                    <p className="text-gray-400 text-sm">Interactive WebSocket and API testing</p>
-                  </div>
-                </Link>
-
-                <a href="http://localhost:3001/api/docs" target="_blank" rel="noopener noreferrer" className="group flex items-center p-4 bg-gray-800/50 border border-gray-700 rounded-lg hover:border-green-500 transition-colors">
-                  <ExternalLink className="w-8 h-8 text-green-400 mr-4" />
-                  <div>
-                    <h3 className="text-white font-semibold group-hover:text-green-400 transition-colors">Open Swagger UI</h3>
-                    <p className="text-gray-400 text-sm">Interactive API documentation</p>
-                  </div>
+            {/* CTA */}
+            <div className="text-center mt-12">
+              <h2 className="text-3xl font-bold text-white mb-6">Ready to Build?</h2>
+              <p className="text-xl text-gray-300 mb-8">
+                Start building real-time applications with the most revolutionary package in the ecosystem.
+              </p>
+              <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                <a
+                  href="https://www.npmjs.com/package/@axonstream/core"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center px-8 py-4 text-lg font-semibold rounded-xl text-white bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 transition-all duration-200 shadow-xl hover:shadow-blue-500/25"
+                >
+                  Install Now
+                  <ExternalLink className="ml-2 w-5 h-5" />
                 </a>
-
-                <Link href="/implementation-status" className="group flex items-center p-4 bg-gray-800/50 border border-gray-700 rounded-lg hover:border-orange-500 transition-colors">
-                  <CheckCircle className="w-8 h-8 text-orange-400 mr-4" />
-                  <div>
-                    <h3 className="text-white font-semibold group-hover:text-orange-400 transition-colors">Check Implementation Status</h3>
-                    <p className="text-gray-400 text-sm">See what&apos;s built and what&apos;s coming</p>
-                  </div>
+                <Link
+                  href="/api-docs"
+                  className="inline-flex items-center px-8 py-4 text-lg font-semibold rounded-xl text-gray-300 bg-gray-800/50 border border-gray-600 hover:bg-gray-700/50 hover:border-gray-500 hover:text-white transition-all duration-200"
+                >
+                  View API Docs
+                  <Play className="ml-2 w-5 h-5" />
                 </Link>
               </div>
             </div>
+
           </div>
         </div>
       </MainContent>
