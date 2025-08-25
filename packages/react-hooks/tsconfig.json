@@ -1,19 +1,33 @@
 {
     "extends": "@repo/typescript-config/react-library.json",
     "compilerOptions": {
-        "outDir": "dist",
-        "rootDir": "src",
+        "target": "ES2022",
+        "module": "ESNext",
+        "lib": [
+            "DOM",
+            "ES2022"
+        ],
+        "moduleResolution": "Node",
+        "strict": true,
+        "skipLibCheck": true,
+        "forceConsistentCasingInFileNames": true,
+        "jsx": "react-jsx",
+        "allowSyntheticDefaultImports": true,
+        "esModuleInterop": true,
         "declaration": true,
-        "declarationMap": true,
-        "sourceMap": true
+        "outDir": "dist",
+        // Path mapping for local packages
+        "baseUrl": ".",
+        "paths": {
+            "@axonstream/core": [
+                "../sdk/dist/index.d.ts"
+            ],
+            "@axonstream/core/*": [
+                "../sdk/dist/*"
+            ]
+        }
     },
     "include": [
-        "src/**/*"
-    ],
-    "exclude": [
-        "node_modules",
-        "dist",
-        "**/*.test.*",
-        "**/*.spec.*"
+        "src"
     ]
 }

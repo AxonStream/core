@@ -3,7 +3,9 @@
   "compilerOptions": {
     "outDir": "dist",
     "declaration": true,
-    "emitDeclarationOnly": false
+    "emitDeclarationOnly": false,
   },
-  "include": ["src"]
+  "include": [
+    "src"
+  ]
 }

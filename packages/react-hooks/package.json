@@ -16,7 +16,7 @@
     }
   },
   "scripts": {
-    "build": "tsup src/index.ts --format esm,cjs --dts",
+    "build": "tsup src/index.ts --format esm,cjs",
     "dev": "tsup src/index.ts --format esm,cjs --watch",
     "lint": "eslint 'src/**/*.{ts,tsx}'",
     "check-types": "tsc --noEmit"
@@ -43,12 +43,17 @@
     "typescript": "^5.8.3"
   },
   "dependencies": {
-    "@axonstream/core": "*"
+    "@axonstream/core": "1.0.0"
   },
   "peerDependencies": {
     "react": ">=18"
   },
   "publishConfig": {
     "access": "public"
-  }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ]
 }

@@ -1,6 +1,6 @@
 {
   "name": "@axonstream/core",
-  "private": true,
+  "version": "1.0.0",
   "description": "AxonStream Real-Time Collaboration Platform by axonstream.ai",
   "author": "axonstream.ai <info@axonstream.ai>",
   "homepage": "https://axonstream.ai",
