@@ -1,5 +1,5 @@
 {
-  "name": "test-fixed-package",
+  "name": "test-published-v2",
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
@@ -10,6 +10,6 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
-    "@axonstream/core": "file:../packages/sdk"
+    "@axonstream/core": "^2.0.0"
   }
 }
