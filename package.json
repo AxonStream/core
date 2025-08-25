@@ -24,6 +24,7 @@
     "publish:sdk": "npm run build:sdk && cd packages/sdk && npm publish",
     "docs:publish": "node scripts/publish-docs.js",
     "docs:setup-pages": "node scripts/enable-github-pages.js",
+    "docs:deploy-pages": "node scripts/deploy-github-pages.js",
     "install:all": "npm install --workspaces",
     "pack:all": "npm run build && npm run pack:packages",
     "pack:packages": "cd packages/sdk && npm pack --pack-destination ../../dist-tarballs && cd ../react-hooks && npm pack --pack-destination ../../dist-tarballs && cd ../cli && npm pack --pack-destination ../../dist-tarballs",
