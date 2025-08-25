@@ -197,6 +197,14 @@ export class AxonPulsClient extends EventEmitter {
     constructor(config: AxonPulsClientConfig) {
         super();
 
+        // Validate required parameters
+        if (!config.url) {
+            throw new Error('AxonPuls URL is required');
+        }
+        if (!config.token || typeof config.token !== 'string') {
+            throw new Error('Valid authentication token is required');
+        }
+
         // Validate and set defaults
         this.config = {
             url: config.url,
@@ -211,10 +219,14 @@ export class AxonPulsClient extends EventEmitter {
 
         this.tokenProvider = config.tokenProvider;
 
-        // Extract org and user info from JWT
-        const payload = this.decodeToken(this.config.token);
-        this.orgId = payload.organizationId;
-        this.userId = payload.sub;
+        // Extract org and user info from JWT with better error handling
+        try {
+            const payload = this.decodeToken(this.config.token);
+            this.orgId = payload.organizationId;
+            this.userId = payload.sub;
+        } catch (error) {
+            throw new Error(`Failed to initialize AxonPuls client: ${error instanceof Error ? error.message : 'Invalid token format'}`);
+        }
 
         if (this.config.debug) {
             console.log(`AxonPuls client initialized for org: ${this.orgId}, user: ${this.userId}`);

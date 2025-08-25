@@ -70,7 +70,7 @@ export const viewport = {
   maximumScale: 1,
 };
 
-export  function RootLayout({
+export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;

@@ -1,0 +1,13 @@
+{
+  "name": "test-local-packages",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "test": "node test-all.mjs"
+  },
+  "dependencies": {
+    "@axonstream/cli": "file:../packages/cli",
+    "@axonstream/core": "file:../packages/sdk",
+    "@axonstream/react": "file:../packages/react-hooks"
+  }
+}

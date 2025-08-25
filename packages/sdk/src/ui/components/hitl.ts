@@ -9,7 +9,7 @@
  * - Escalation handling
  */
 
-import { AxonUIComponent, type ComponentConfig, createElement, formatTimestamp } from '../index';
+import { AxonUIComponent, type ComponentConfig, createElement, formatTimestamp } from '../base';
 import type { AxonPulsEvent, AxonPulsClient } from '../../core/client';
 
 interface HITLRequest {

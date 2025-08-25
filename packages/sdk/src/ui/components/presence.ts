@@ -9,7 +9,7 @@
  * - Activity indicators
  */
 
-import { AxonUIComponent, type ComponentConfig, createElement } from '../index';
+import { AxonUIComponent, type ComponentConfig, createElement } from '../base';
 import type { AxonPulsEvent, AxonPulsClient } from '../../core/client';
 
 interface PresenceUser {

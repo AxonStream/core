@@ -1,6 +1,6 @@
 {
   "name": "@axonstream/core",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "license": "MIT",
   "type": "module",
   "main": "dist/index.cjs",
@@ -57,7 +57,9 @@
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
-    "lint": "eslint 'src/**/*.{ts,tsx}'"
+    "lint": "eslint 'src/**/*.{ts,tsx}'",
+    "typecheck": "tsc --noEmit",
+    "test:local": "npm run build && node test-sdk-local.mjs"
   },
   "dependencies": {
     "axios": "^1.7.9",

@@ -9,7 +9,7 @@
  * - Custom themes
  */
 
-import { AxonUIComponent, type ComponentConfig, createElement, formatTimestamp, sanitizeHtml } from '../index';
+import { AxonUIComponent, type ComponentConfig, createElement, formatTimestamp, sanitizeHtml } from '../base';
 import type { AxonPulsEvent, AxonPulsClient } from '../../core/client';
 
 export interface ChatConfig extends ComponentConfig {

@@ -9,7 +9,7 @@
  * - Auto-configuration
  */
 
-import { AxonUIComponent, type ComponentConfig, createElement } from '../index';
+import { AxonUIComponent, type ComponentConfig, createElement } from '../base';
 import { AxonChat, type ChatConfig } from './chat';
 import { AxonPresence, type PresenceConfig } from './presence';
 import { AxonHITL, type HITLConfig } from './hitl';
