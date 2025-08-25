@@ -1,0 +1,15 @@
+User-agent: *
+Allow: /
+
+# Sitemaps
+Sitemap: https://docs.axonstream.ai/sitemap.xml
+
+# Allow search engines to index documentation
+User-agent: Googlebot
+Allow: /
+
+User-agent: Bingbot
+Allow: /
+
+# Crawl-delay for respectful crawling
+Crawl-delay: 1
