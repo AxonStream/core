@@ -1,0 +1,84 @@
+{
+  "name": "@axonstream/core",
+  "version": "1.0.0",
+  "description": "ONE PACKAGE FOR EVERYTHING: Core SDK + React/Vue/Angular + UI Components + Embed Helper - AxonStream AI Real-Time Platform",
+  "author": "AxonStream AI <info@axonstream.ai>",
+  "homepage": "https://axonstream.ai",
+  "main": "dist/index.cjs",
+  "module": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "browser": "dist/axonui.min.js",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./cdn": "./dist/axonui.min.js",
+    "./embed": {
+      "import": "./dist/embed.js",
+      "require": "./dist/embed.cjs"
+    },
+    "./react": {
+      "types": "./dist/adapters/react.d.ts",
+      "import": "./dist/adapters/react.js",
+      "require": "./dist/adapters/react.cjs"
+    },
+    "./vue": {
+      "types": "./dist/adapters/vue.d.ts",
+      "import": "./dist/adapters/vue.js",
+      "require": "./dist/adapters/vue.cjs"
+    },
+    "./angular": {
+      "types": "./dist/adapters/angular.d.ts",
+      "import": "./dist/adapters/angular.js",
+      "require": "./dist/adapters/angular.cjs"
+    },
+    "./ui": {
+      "types": "./dist/ui/index.d.ts",
+      "import": "./dist/ui/index.js",
+      "require": "./dist/ui/index.cjs"
+    }
+  },
+  "scripts": {
+    "build": "npm run build:sdk && npm run build:adapters && npm run build:ui && npm run build:cdn && npm run build:embed",
+    "build:sdk": "tsup src/index.ts --format esm,cjs --dts",
+    "build:adapters": "tsup src/adapters/react.ts src/adapters/vue.ts src/adapters/angular.ts --format esm,cjs --dts --out-dir dist/adapters",
+    "build:ui": "tsup src/ui/index.ts --format esm,cjs --dts --out-dir dist/ui",
+    "build:cdn": "tsup src/cdn.ts --format iife --global-name AxonStream --out-dir dist --minify",
+    "build:embed": "tsup src/embed.ts --format esm,cjs",
+    "dev": "tsup src/index.ts --format esm,cjs --watch",
+    "dev:all": "concurrently \"npm run dev\" \"tsup src/adapters/*.ts --format esm,cjs --watch --out-dir dist/adapters\" \"tsup src/ui/index.ts --format esm,cjs --watch --out-dir dist/ui\"",
+    "lint": "eslint 'src/**/*.{ts,tsx}'"
+  },
+  "dependencies": {
+    "axios": "^1.7.9",
+    "socket.io-client": "^4.8.1",
+    "zod": "^3.23.8",
+    "jwt-decode": "^4.0.0"
+  },
+  "devDependencies": {
+    "tsup": "^8.3.0",
+    "typescript": "^5.9.2",
+    "concurrently": "^9.0.1"
+  },
+  "peerDependencies": {
+    "react": ">=16.8.0",
+    "vue": ">=2.6.0 || >=3.0.0",
+    "@angular/core": ">=12.0.0"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    },
+    "vue": {
+      "optional": true
+    },
+    "@angular/core": {
+      "optional": true
+    }
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

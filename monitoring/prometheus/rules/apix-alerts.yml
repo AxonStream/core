@@ -1,0 +1,210 @@
+# AxonPuls Platform Alerting Rules
+groups:
+  - name: AxonPuls-platform-alerts
+    interval: 15s
+    rules:
+      # High Connection Count Alert
+      - alert: AxonPulsHighConnectionCount
+        expr: AxonPuls_websocket_connections_total > 1000
+        for: 2m
+        labels:
+          severity: warning
+          service: AxonPuls-gateway
+        annotations:
+          summary: "High WebSocket connection count on AxonPuls Gateway"
+          description: "WebSocket connections have exceeded 1000 for more than 2 minutes. Current value: {{ $value }}"
+
+      # Critical Connection Count Alert
+      - alert: AxonPulsCriticalConnectionCount
+        expr: AxonPuls_websocket_connections_total > 5000
+        for: 1m
+        labels:
+          severity: critical
+          service: AxonPuls-gateway
+        annotations:
+          summary: "Critical WebSocket connection count on AxonPuls Gateway"
+          description: "WebSocket connections have exceeded 5000 for more than 1 minute. Current value: {{ $value }}. Immediate action required."
+
+      # High Error Rate Alert
+      - alert: AxonPulsHighErrorRate
+        expr: rate(AxonPuls_errors_total[5m]) > 10
+        for: 3m
+        labels:
+          severity: warning
+          service: AxonPuls-platform
+        annotations:
+          summary: "High error rate in AxonPuls Platform"
+          description: "Error rate has exceeded 10 errors/sec for more than 3 minutes. Current rate: {{ $value }}/sec"
+
+      # Critical Error Rate Alert
+      - alert: AxonPulsCriticalErrorRate
+        expr: rate(AxonPuls_errors_total[5m]) > 50
+        for: 1m
+        labels:
+          severity: critical
+          service: AxonPuls-platform
+        annotations:
+          summary: "Critical error rate in AxonPuls Platform"
+          description: "Error rate has exceeded 50 errors/sec for more than 1 minute. Current rate: {{ $value }}/sec. Platform may be unstable."
+
+      # Service Down Alert
+      - alert: AxonPulsServiceDown
+        expr: AxonPuls_service_health == 0
+        for: 30s
+        labels:
+          severity: critical
+          service: "{{ $labels.service }}"
+        annotations:
+          summary: "AxonPuls service is down"
+          description: "AxonPuls service {{ $labels.service }} on instance {{ $labels.instance }} has been down for more than 30 seconds."
+
+      # High Memory Usage Alert
+      - alert: AxonPulsHighMemoryUsage
+        expr: (process_resident_memory_bytes{job="AxonPuls-api"} / 1024 / 1024 / 1024) > 2
+        for: 5m
+        labels:
+          severity: warning
+          service: AxonPuls-api
+        annotations:
+          summary: "High memory usage in AxonPuls API"
+          description: "AxonPuls API memory usage has exceeded 2GB for more than 5 minutes. Current usage: {{ $value }}GB"
+
+      # Redis Connection Issues
+      - alert: AxonPulsRedisConnectionIssues
+        expr: redis_connected_clients{job="redis"} < 1
+        for: 1m
+        labels:
+          severity: critical
+          service: redis
+        annotations:
+          summary: "Redis connection issues"
+          description: "Redis has no connected clients for more than 1 minute. AxonPuls platform may lose real-time capabilities."
+
+      # High Message Latency Alert
+      - alert: AxonPulsHighMessageLatency
+        expr: histogram_quantile(0.95, AxonPuls_websocket_message_duration_seconds_bucket) > 0.5
+        for: 3m
+        labels:
+          severity: warning
+          service: AxonPuls-gateway
+        annotations:
+          summary: "High message latency in AxonPuls Gateway"
+          description: "95th percentile message latency has exceeded 500ms for more than 3 minutes. Current latency: {{ $value }}s"
+
+      # Circuit Breaker Open Alert
+      - alert: AxonPulsCircuitBreakerOpen
+        expr: rate(AxonPuls_circuit_breaker_open_total[5m]) > 0
+        for: 1m
+        labels:
+          severity: warning
+          service: AxonPuls-platform
+        annotations:
+          summary: "Circuit breakers opening in AxonPuls Platform"
+          description: "Circuit breakers are opening at a rate of {{ $value }}/sec, indicating potential service degradation."
+
+      # Low Event Throughput Alert
+      - alert: AxonPulsLowEventThroughput
+        expr: rate(AxonPuls_events_published_total[5m]) < 1 and rate(AxonPuls_events_published_total[30m]) > 10
+        for: 10m
+        labels:
+          severity: warning
+          service: AxonPuls-platform
+        annotations:
+          summary: "Low event throughput in AxonPuls Platform"
+          description: "Event publishing rate has dropped below 1/sec for more than 10 minutes, but was previously active."
+
+      # Database Connection Issues
+      - alert: AxonPulsDatabaseConnectionIssues
+        expr: pg_up{job="postgresql"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: postgresql
+        annotations:
+          summary: "PostgreSQL database is down"
+          description: "PostgreSQL database has been down for more than 1 minute. AxonPuls platform data persistence is affected."
+
+      # High JWT Token Validation Failures
+      - alert: AxonPulsHighTokenValidationFailures
+        expr: rate(AxonPuls_jwt_validation_failures_total[5m]) > 5
+        for: 2m
+        labels:
+          severity: warning
+          service: AxonPuls-auth
+        annotations:
+          summary: "High JWT token validation failures"
+          description: "JWT token validation is failing at a rate of {{ $value }}/sec for more than 2 minutes. Possible security issue or token misconfiguration."
+
+      # Tenant Isolation Violations
+      - alert: AxonPulsTenantIsolationViolations
+        expr: rate(AxonPuls_tenant_isolation_violations_total[5m]) > 0
+        for: 1m
+        labels:
+          severity: critical
+          service: AxonPuls-platform
+        annotations:
+          summary: "Tenant isolation violations detected"
+          description: "Tenant isolation violations detected at a rate of {{ $value }}/sec. Critical security issue requiring immediate attention."
+
+      # Storage Usage Alert
+      - alert: AxonPulsHighStorageUsage
+        expr: (node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"}) < 0.1
+        for: 5m
+        labels:
+          severity: critical
+          service: system
+        annotations:
+          summary: "High storage usage on AxonPuls server"
+          description: "Storage usage has exceeded 90% for more than 5 minutes. Available space: {{ $value }}%"
+
+  - name: AxonPuls-performance-alerts
+    interval: 30s
+    rules:
+      # SLA Violation - Response Time
+      - alert: AxonPulsSLAResponseTimeViolation
+        expr: histogram_quantile(0.95, rate(AxonPuls_http_request_duration_seconds_bucket[5m])) > 1.0
+        for: 2m
+        labels:
+          severity: warning
+          service: AxonPuls-api
+          sla: response-time
+        annotations:
+          summary: "SLA violation: High response time"
+          description: "95th percentile response time {{ $value }}s exceeds 1.0s SLA for more than 2 minutes."
+
+      # SLA Violation - Availability
+      - alert: AxonPulsSLAAvailabilityViolation
+        expr: (rate(AxonPuls_http_requests_total{status=~"2..|3.."}[5m]) / rate(AxonPuls_http_requests_total[5m])) < 0.995
+        for: 1m
+        labels:
+          severity: critical
+          service: AxonPuls-platform
+          sla: availability
+        annotations:
+          summary: "SLA violation: Low availability"
+          description: "Platform availability {{ $value }}% is below 99.5% SLA for more than 1 minute."
+
+  - name: AxonPuls-business-alerts
+    interval: 60s
+    rules:
+      # Webhook Delivery Failures
+      - alert: AxonPulsWebhookDeliveryFailures
+        expr: rate(AxonPuls_webhook_delivery_failures_total[10m]) > 1
+        for: 5m
+        labels:
+          severity: warning
+          service: AxonPuls-webhooks
+        annotations:
+          summary: "High webhook delivery failure rate"
+          description: "Webhook delivery failures exceed 1/sec for more than 5 minutes. Rate: {{ $value }}/sec"
+
+      # Event Replay Requests
+      - alert: AxonPulsHighEventReplayRequests
+        expr: rate(AxonPuls_event_replay_requests_total[10m]) > 10
+        for: 5m
+        labels:
+          severity: info
+          service: AxonPuls-platform
+        annotations:
+          summary: "High number of event replay requests"
+          description: "Event replay requests exceed 10/sec for more than 5 minutes. May indicate client issues or data loss concerns."

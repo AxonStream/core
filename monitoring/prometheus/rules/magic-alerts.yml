@@ -1,0 +1,167 @@
+groups:
+  - name: magic_collaboration_alerts
+    rules:
+      # High Operation Latency
+      - alert: MagicHighOperationLatency
+        expr: magic_operation_latency_avg > 1000
+        for: 5m
+        labels:
+          severity: warning
+          service: magic
+        annotations:
+          summary: "High Magic operation latency detected"
+          description: "Magic operations are taking {{ $value }}ms on average, which is above the 1000ms threshold"
+
+      # Critical Operation Latency
+      - alert: MagicCriticalOperationLatency
+        expr: magic_operation_latency_avg > 2000
+        for: 2m
+        labels:
+          severity: critical
+          service: magic
+        annotations:
+          summary: "Critical Magic operation latency detected"
+          description: "Magic operations are taking {{ $value }}ms on average, which is critically slow"
+
+      # High Error Rate
+      - alert: MagicHighErrorRate
+        expr: rate(magic_operation_errors_total[5m]) / rate(magic_operations_total[5m]) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+          service: magic
+        annotations:
+          summary: "High Magic operation error rate"
+          description: "Magic operation error rate is {{ $value | humanizePercentage }}, above 5% threshold"
+
+      # Critical Error Rate
+      - alert: MagicCriticalErrorRate
+        expr: rate(magic_operation_errors_total[5m]) / rate(magic_operations_total[5m]) > 0.10
+        for: 2m
+        labels:
+          severity: critical
+          service: magic
+        annotations:
+          summary: "Critical Magic operation error rate"
+          description: "Magic operation error rate is {{ $value | humanizePercentage }}, above 10% threshold"
+
+      # High Conflict Rate
+      - alert: MagicHighConflictRate
+        expr: rate(magic_conflicts_total[5m]) / rate(magic_operations_total[5m]) > 0.20
+        for: 10m
+        labels:
+          severity: warning
+          service: magic
+        annotations:
+          summary: "High Magic operation conflict rate"
+          description: "Magic operation conflict rate is {{ $value | humanizePercentage }}, indicating potential issues with concurrent editing"
+
+      # Presence Heartbeat Failures
+      - alert: MagicPresenceHeartbeatFailures
+        expr: magic_presence_heartbeat_success_rate < 0.95
+        for: 5m
+        labels:
+          severity: warning
+          service: magic
+        annotations:
+          summary: "Magic presence heartbeat failures detected"
+          description: "Magic presence heartbeat success rate is {{ $value | humanizePercentage }}, below 95% threshold"
+
+      # Time Travel Operation Failures
+      - alert: MagicTimeTravelFailures
+        expr: rate(magic_timetravel_errors_total[5m]) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+          service: magic
+        annotations:
+          summary: "Magic time travel operation failures"
+          description: "Magic time travel operations are failing at {{ $value }} errors/sec"
+
+      # Room Connection Issues
+      - alert: MagicRoomConnectionDrop
+        expr: decrease(magic_active_rooms[5m]) > 10
+        for: 2m
+        labels:
+          severity: warning
+          service: magic
+        annotations:
+          summary: "Significant drop in active Magic rooms"
+          description: "Active Magic rooms decreased by {{ $value }} in the last 5 minutes"
+
+      # Memory Usage (State Size)
+      - alert: MagicHighStateSize
+        expr: magic_average_state_size_bytes > 10485760  # 10MB
+        for: 10m
+        labels:
+          severity: warning
+          service: magic
+        annotations:
+          summary: "Magic room states are getting large"
+          description: "Average Magic room state size is {{ $value | humanizeBytes }}, consider optimization"
+
+      # Cache Performance
+      - alert: MagicLowCacheHitRate
+        expr: magic_cache_hit_rate < 0.80
+        for: 10m
+        labels:
+          severity: warning
+          service: magic
+        annotations:
+          summary: "Low Magic cache hit rate"
+          description: "Magic cache hit rate is {{ $value | humanizePercentage }}, below 80% threshold"
+
+      # Service Down
+      - alert: MagicServiceDown
+        expr: up{job="magic"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: magic
+        annotations:
+          summary: "Magic collaboration service is down"
+          description: "Magic collaboration service has been down for more than 1 minute"
+
+      # High CPU Usage
+      - alert: MagicHighCPU
+        expr: rate(process_cpu_seconds_total{job="magic"}[5m]) > 0.8
+        for: 5m
+        labels:
+          severity: warning
+          service: magic
+        annotations:
+          summary: "High CPU usage in Magic service"
+          description: "Magic service CPU usage is {{ $value | humanizePercentage }}"
+
+      # High Memory Usage
+      - alert: MagicHighMemory
+        expr: process_resident_memory_bytes{job="magic"} > 1073741824  # 1GB
+        for: 5m
+        labels:
+          severity: warning
+          service: magic
+        annotations:
+          summary: "High memory usage in Magic service"
+          description: "Magic service memory usage is {{ $value | humanizeBytes }}"
+
+      # Database Connection Issues
+      - alert: MagicDatabaseConnectionErrors
+        expr: rate(magic_database_errors_total[5m]) > 0.1
+        for: 2m
+        labels:
+          severity: critical
+          service: magic
+        annotations:
+          summary: "Magic service database connection errors"
+          description: "Magic service is experiencing {{ $value }} database errors/sec"
+
+      # Redis Connection Issues
+      - alert: MagicRedisConnectionErrors
+        expr: rate(magic_redis_errors_total[5m]) > 0.1
+        for: 2m
+        labels:
+          severity: critical
+          service: magic
+        annotations:
+          summary: "Magic service Redis connection errors"
+          description: "Magic service is experiencing {{ $value }} Redis errors/sec"

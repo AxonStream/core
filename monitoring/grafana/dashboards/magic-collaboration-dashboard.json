@@ -1,0 +1,256 @@
+{
+    "dashboard": {
+        "id": null,
+        "title": "Magic Collaboration Platform",
+        "tags": [
+            "magic",
+            "collaboration",
+            "realtime"
+        ],
+        "style": "dark",
+        "timezone": "browser",
+        "refresh": "30s",
+        "time": {
+            "from": "now-1h",
+            "to": "now"
+        },
+        "panels": [
+            {
+                "id": 1,
+                "title": "Magic System Overview",
+                "type": "stat",
+                "targets": [
+                    {
+                        "expr": "magic_total_rooms",
+                        "legendFormat": "Total Rooms"
+                    },
+                    {
+                        "expr": "magic_active_rooms",
+                        "legendFormat": "Active Rooms"
+                    },
+                    {
+                        "expr": "magic_active_presences",
+                        "legendFormat": "Active Users"
+                    },
+                    {
+                        "expr": "magic_operations_per_second",
+                        "legendFormat": "Ops/sec"
+                    }
+                ],
+                "gridPos": {
+                    "h": 8,
+                    "w": 24,
+                    "x": 0,
+                    "y": 0
+                }
+            },
+            {
+                "id": 2,
+                "title": "Operations Performance",
+                "type": "graph",
+                "targets": [
+                    {
+                        "expr": "rate(magic_operations_total[5m])",
+                        "legendFormat": "Operations/sec"
+                    },
+                    {
+                        "expr": "magic_operation_latency_avg",
+                        "legendFormat": "Average Latency (ms)"
+                    }
+                ],
+                "gridPos": {
+                    "h": 8,
+                    "w": 12,
+                    "x": 0,
+                    "y": 8
+                },
+                "yAxes": [
+                    {
+                        "label": "Operations/sec",
+                        "min": 0
+                    },
+                    {
+                        "label": "Latency (ms)",
+                        "min": 0
+                    }
+                ]
+            },
+            {
+                "id": 3,
+                "title": "Conflict Resolution",
+                "type": "graph",
+                "targets": [
+                    {
+                        "expr": "rate(magic_conflicts_total[5m])",
+                        "legendFormat": "Conflicts/sec"
+                    },
+                    {
+                        "expr": "magic_conflict_resolution_success_rate",
+                        "legendFormat": "Resolution Success Rate"
+                    }
+                ],
+                "gridPos": {
+                    "h": 8,
+                    "w": 12,
+                    "x": 12,
+                    "y": 8
+                },
+                "yAxes": [
+                    {
+                        "label": "Conflicts/sec",
+                        "min": 0
+                    },
+                    {
+                        "label": "Success Rate",
+                        "min": 0,
+                        "max": 1
+                    }
+                ]
+            },
+            {
+                "id": 4,
+                "title": "Real-time Presence",
+                "type": "graph",
+                "targets": [
+                    {
+                        "expr": "magic_presence_joins_total",
+                        "legendFormat": "Joins"
+                    },
+                    {
+                        "expr": "magic_presence_leaves_total",
+                        "legendFormat": "Leaves"
+                    },
+                    {
+                        "expr": "magic_presence_heartbeat_success_rate",
+                        "legendFormat": "Heartbeat Success Rate"
+                    }
+                ],
+                "gridPos": {
+                    "h": 8,
+                    "w": 12,
+                    "x": 0,
+                    "y": 16
+                }
+            },
+            {
+                "id": 5,
+                "title": "Time Travel Usage",
+                "type": "graph",
+                "targets": [
+                    {
+                        "expr": "rate(magic_snapshots_created_total[5m])",
+                        "legendFormat": "Snapshots Created/sec"
+                    },
+                    {
+                        "expr": "rate(magic_branches_created_total[5m])",
+                        "legendFormat": "Branches Created/sec"
+                    },
+                    {
+                        "expr": "rate(magic_merges_total[5m])",
+                        "legendFormat": "Merges/sec"
+                    }
+                ],
+                "gridPos": {
+                    "h": 8,
+                    "w": 12,
+                    "x": 12,
+                    "y": 16
+                }
+            },
+            {
+                "id": 6,
+                "title": "Error Rates",
+                "type": "graph",
+                "targets": [
+                    {
+                        "expr": "rate(magic_operation_errors_total[5m])",
+                        "legendFormat": "Operation Errors/sec"
+                    },
+                    {
+                        "expr": "rate(magic_presence_errors_total[5m])",
+                        "legendFormat": "Presence Errors/sec"
+                    },
+                    {
+                        "expr": "rate(magic_timetravel_errors_total[5m])",
+                        "legendFormat": "Time Travel Errors/sec"
+                    }
+                ],
+                "gridPos": {
+                    "h": 8,
+                    "w": 12,
+                    "x": 0,
+                    "y": 24
+                }
+            },
+            {
+                "id": 7,
+                "title": "System Health",
+                "type": "stat",
+                "targets": [
+                    {
+                        "expr": "magic_system_status",
+                        "legendFormat": "System Status"
+                    },
+                    {
+                        "expr": "magic_cache_hit_rate",
+                        "legendFormat": "Cache Hit Rate"
+                    },
+                    {
+                        "expr": "magic_average_state_size_bytes",
+                        "legendFormat": "Avg State Size (bytes)"
+                    }
+                ],
+                "gridPos": {
+                    "h": 8,
+                    "w": 12,
+                    "x": 12,
+                    "y": 24
+                }
+            },
+            {
+                "id": 8,
+                "title": "Top Organizations by Activity",
+                "type": "table",
+                "targets": [
+                    {
+                        "expr": "topk(10, sum by (organization_id) (rate(magic_operations_total[1h])))",
+                        "legendFormat": "{{organization_id}}"
+                    }
+                ],
+                "gridPos": {
+                    "h": 8,
+                    "w": 12,
+                    "x": 0,
+                    "y": 32
+                }
+            },
+            {
+                "id": 9,
+                "title": "Room Activity Heatmap",
+                "type": "heatmap",
+                "targets": [
+                    {
+                        "expr": "sum by (room_id) (rate(magic_operations_total[5m]))",
+                        "legendFormat": "{{room_id}}"
+                    }
+                ],
+                "gridPos": {
+                    "h": 8,
+                    "w": 12,
+                    "x": 12,
+                    "y": 32
+                }
+            }
+        ],
+        "annotations": {
+            "list": [
+                {
+                    "name": "Magic Deployments",
+                    "datasource": "prometheus",
+                    "expr": "increase(magic_deployment_total[1h])",
+                    "iconColor": "green"
+                }
+            ]
+        }
+    }
+}

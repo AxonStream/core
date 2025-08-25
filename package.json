@@ -1,0 +1,43 @@
+{
+  "name": "@axonstream/core",
+  "private": true,
+  "description": "AxonStream Real-Time Collaboration Platform by axonstream.ai",
+  "author": "axonstream.ai <info@axonstream.ai>",
+  "homepage": "https://axonstream.ai",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/AxonStream/core"
+  },
+  "scripts": {
+    "build": "turbo run build",
+    "build:fast": "tsup",
+    "dev": "turbo run dev",
+    "lint": "turbo run lint",
+    "format": "prettier --write \"**/*.{ts,tsx,md}\"",
+    "check-types": "turbo run check-types",
+    "install:all": "npm install --workspaces",
+    "pack:all": "npm run build && npm run pack:packages",
+    "pack:packages": "cd packages/sdk && npm pack --pack-destination ../../dist-tarballs && cd ../react-hooks && npm pack --pack-destination ../../dist-tarballs && cd ../cli && npm pack --pack-destination ../../dist-tarballs",
+    "publish:all": "npm run pack:all && npm run publish:packages",
+    "publish:packages": "cd packages/sdk && npm publish && cd ../react-hooks && npm publish && cd ../cli && npm publish",
+    "release": "npm run build && npm run pack:all && npm run publish:packages",
+    "one-command": "npm run release && echo '🎉 AxonStream packages published successfully!'"
+  },
+  "devDependencies": {
+    "prettier": "^3.6.2",
+    "tsup": "^8.5.0",
+    "turbo": "^2.5.5",
+    "typescript": "5.8.3"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "packageManager": "npm@10.9.2",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "dependencies": {
+    "socket.io-client": "^4.8.1"
+  }
+}
