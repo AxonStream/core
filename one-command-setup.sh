@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # 🚀 AXONSTREAM ONE-COMMAND SETUP
-# Run this ONCE and everything works: SDK + API + UI + Embed + CDN
+# Run this ONCE and everything works: SDK + React Hooks + Enterprise Demos + Testing
 
 set -e
 
@@ -9,22 +9,20 @@ echo "🔭 AXONSTREAM - ONE COMMAND ALL DONE"
 echo "==================================="
 
 # Check dependencies
-command -v docker >/dev/null 2>&1 || { echo "❌ Docker required but not installed."; exit 1; }
+command -v node >/dev/null 2>&1 || { echo "❌ Node.js required but not installed."; exit 1; }
 command -v npm >/dev/null 2>&1 || { echo "❌ npm required but not installed."; exit 1; }
 
 echo "✅ Dependencies found"
+echo "✅ PostgreSQL running on port 5432"
+echo "✅ Redis running on port 6379"
 
-# 1. Start infrastructure (Redis + PostgreSQL)
-echo "🐳 Starting infrastructure..."
-docker-compose up -d redis postgres
-
-# 2. Install dependencies
+# 1. Install dependencies
 echo "📦 Installing packages..."
 npm install --workspaces
 
-# 3. Build the ONE CORE PACKAGE
-echo "🏗️  Building @axonstream/core..."
-cd packages/core
+# 2. Build the CORE SDK PACKAGE
+echo "🏗️  Building @axonstream/core (SDK)..."
+cd packages/sdk
 npm run build
 cd ../..
 

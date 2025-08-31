@@ -24,6 +24,9 @@ export type EventListener<T = any> = (data: T) => void;
 
 export class EventEmitter<T extends EventMap = DefaultEvents> {
     private events: { [K in keyof T]?: EventListener<T[K]>[] } = {};
+    private errorCounts: Map<EventListener<any>, number> = new Map();
+    private maxErrors = 5; // Remove listener after 5 consecutive errors
+    private errorHandler?: (error: Error, event: keyof T, listener: EventListener<any>) => void;
 
     on<K extends keyof T>(event: K, listener: EventListener<T[K]>): this {
         if (!this.events[event]) {
@@ -51,12 +54,42 @@ export class EventEmitter<T extends EventMap = DefaultEvents> {
         const listeners = this.events[event];
         if (!listeners) return false;
 
+        // 🛡️ IMPROVED ERROR HANDLING - Recovery mechanisms
+        const listenersToRemove: EventListener<T[K]>[] = [];
+
         listeners.forEach(listener => {
             try {
                 listener(data as T[K]);
+                // Reset error count on successful execution
+                this.errorCounts.delete(listener);
             } catch (error) {
-                console.error(`Error in event listener for ${String(event)}:`, error);
+                const errorCount = (this.errorCounts.get(listener) || 0) + 1;
+                this.errorCounts.set(listener, errorCount);
+
+                // Call custom error handler if provided
+                if (this.errorHandler) {
+                    try {
+                        this.errorHandler(error as Error, event, listener);
+                    } catch (handlerError) {
+                        // Fallback if error handler itself fails
+                        this.logError(`Error handler failed for event ${String(event)}:`, handlerError);
+                    }
+                } else {
+                    this.logError(`Error in event listener for ${String(event)}:`, error);
+                }
+
+                // Remove listener if it has failed too many times
+                if (errorCount >= this.maxErrors) {
+                    listenersToRemove.push(listener);
+                    this.logError(`Removing listener for ${String(event)} after ${errorCount} consecutive errors`);
+                }
             }
+        });
+
+        // Remove problematic listeners
+        listenersToRemove.forEach(listener => {
+            this.off(event, listener);
+            this.errorCounts.delete(listener);
         });
 
         return true;
@@ -85,5 +118,47 @@ export class EventEmitter<T extends EventMap = DefaultEvents> {
 
     listeners<K extends keyof T>(event: K): EventListener<T[K]>[] {
         return [...(this.events[event] || [])];
+    }
+
+    /**
+     * Set custom error handler for listener failures
+     */
+    setErrorHandler(handler: (error: Error, event: keyof T, listener: EventListener<any>) => void): this {
+        this.errorHandler = handler;
+        return this;
+    }
+
+    /**
+     * Get error statistics
+     */
+    getErrorStats(): { totalErrors: number; listenersWithErrors: number } {
+        const totalErrors = Array.from(this.errorCounts.values()).reduce((sum, count) => sum + count, 0);
+        return {
+            totalErrors,
+            listenersWithErrors: this.errorCounts.size
+        };
+    }
+
+    /**
+     * 🛡️ PRODUCTION LOGGING - Replace console.error
+     */
+    private logError(message: string, error?: any): void {
+        // In production, this should integrate with your logging service
+        if (typeof process !== 'undefined' && process.env?.NODE_ENV === 'production') {
+            // Production logging - could integrate with services like DataDog, Sentry, etc.
+            // For now, we'll use a structured log format
+            const logEntry = {
+                timestamp: new Date().toISOString(),
+                level: 'ERROR',
+                source: 'EventEmitter',
+                message,
+                error: error?.message || error,
+                stack: error?.stack
+            };
+            console.error(JSON.stringify(logEntry));
+        } else {
+            // Development logging - more readable
+            console.error(`[EventEmitter] ${message}`, error);
+        }
     }
 }

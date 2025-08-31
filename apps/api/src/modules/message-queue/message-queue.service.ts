@@ -120,8 +120,8 @@ export class MessageQueueService implements OnModuleInit {
   ): Promise<QueueMessage[]> {
     try {
       const queueKey = this.getQueueKey(queueName);
-      const blockTime = options.blockTime || 5000;
-      const batchSize = options.batchSize || 10;
+      const blockTime = options.blockTime || this.configService.get<number>('queue.consumer.blockTime', 5000);
+      const batchSize = options.batchSize || this.configService.get<number>('queue.consumer.batchSize', 10);
 
       const messages = await this.redisService.readFromConsumerGroup(
         queueKey,
@@ -152,7 +152,7 @@ export class MessageQueueService implements OnModuleInit {
   ): Promise<void> {
     try {
       const queueKey = this.getQueueKey(queueName);
-      
+
       // Get message details
       const messages = await this.redisService.readFromStream(queueKey, messageId, 1);
       if (messages.length === 0) {
@@ -160,14 +160,14 @@ export class MessageQueueService implements OnModuleInit {
       }
 
       const message = this.parseQueueMessage(messages[0]);
-      
+
       try {
         // Process the message
         await processor(message);
-        
+
         // Acknowledge successful processing
         await this.acknowledgeMessage(queueKey, messageId);
-        
+
         this.logger.debug(`Successfully processed message ${messageId}`);
       } catch (processingError) {
         // Handle processing failure
@@ -195,7 +195,7 @@ export class MessageQueueService implements OnModuleInit {
     options: ConsumerOptions = {}
   ): Promise<void> {
     const consumerKey = `${queueName}-${this.consumerName}`;
-    
+
     if (this.activeConsumers.get(consumerKey)) {
       this.logger.warn(`Consumer for ${queueName} is already running`);
       return;
@@ -229,7 +229,7 @@ export class MessageQueueService implements OnModuleInit {
     while (this.activeConsumers.get(consumerKey)) {
       try {
         const messages = await this.dequeue(queueName, options);
-        
+
         if (messages.length === 0) {
           continue;
         }
@@ -238,7 +238,7 @@ export class MessageQueueService implements OnModuleInit {
         const processingPromises = messages.slice(0, concurrency).map(async (message) => {
           try {
             await processor(message);
-            
+
             if (autoAck && message.id) {
               const queueKey = this.getQueueKey(queueName);
               await this.acknowledgeMessage(queueKey, message.id);
@@ -251,7 +251,8 @@ export class MessageQueueService implements OnModuleInit {
         await Promise.allSettled(processingPromises);
       } catch (error) {
         this.logger.error(`Error in consumer loop for ${queueName}:`, error);
-        await new Promise(resolve => setTimeout(resolve, 1000)); // Brief pause on error
+        const errorPauseMs = this.configService.get<number>('queue.consumer.errorPauseMs', 1000);
+        await new Promise(resolve => setTimeout(resolve, errorPauseMs)); // Configurable pause on error
       }
     }
   }
@@ -283,7 +284,7 @@ export class MessageQueueService implements OnModuleInit {
 
   private async scheduleRetry(message: QueueMessage, delay: number): Promise<void> {
     const retryQueue = this.getQueueKey('retry');
-    
+
     // Schedule for future processing
     setTimeout(async () => {
       try {
@@ -341,19 +342,20 @@ export class MessageQueueService implements OnModuleInit {
     if (options.delay && options.delay > 0) {
       return 'delayed';
     }
-    
+
     if (message.priority > 5) {
       return 'high-priority';
     } else if (message.priority < 0) {
       return 'low-priority';
     }
-    
+
     return 'normal-priority';
   }
 
   private calculateBackoffDelay(attempts: number): number {
     const baseDelay = this.configService.get<number>('queue.backoffDelay', 1000);
-    return Math.min(baseDelay * Math.pow(2, attempts - 1), 30000); // Max 30 seconds
+    const maxDelay = this.configService.get<number>('queue.maxBackoffDelay', 30000);
+    return Math.min(baseDelay * Math.pow(2, attempts - 1), maxDelay);
   }
 
   private getQueueKey(queueName: string): string {
@@ -399,15 +401,15 @@ export class MessageQueueService implements OnModuleInit {
     try {
       const dlqKey = this.getDLQKey(queueName);
       const targetQueueKey = this.getQueueKey(queueName);
-      
+
       const messages = await this.redisService.readFromStream(dlqKey, '0', 100);
-      
+
       for (const message of messages) {
         const queueMessage = this.parseQueueMessage(message);
         queueMessage.attempts = 0; // Reset attempts
         queueMessage.error = undefined;
         queueMessage.failedAt = undefined;
-        
+
         await this.redisService.addToStream(targetQueueKey, queueMessage);
       }
 

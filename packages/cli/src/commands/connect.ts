@@ -28,13 +28,14 @@ export async function connectCommand(options: any) {
 
     // Validate token
     const tokenInfo = validateToken(token);
-    if (!tokenInfo.valid) {
+    if (!tokenInfo.valid || !tokenInfo.payload) {
       spinner.fail('Invalid token');
       console.error(chalk.red(`Token validation failed: ${tokenInfo.error}`));
       process.exit(1);
     }
 
-    spinner.text = `Connecting to ${url} for org ${tokenInfo.payload.organizationId}...`;
+    const organizationId = tokenInfo.payload.organizationId || tokenInfo.payload.orgId;
+    spinner.text = `Connecting to ${url} for org ${organizationId}...`;
 
     // Create client and test connection
     const client = createAxonPulsClient({
@@ -55,9 +56,9 @@ export async function connectCommand(options: any) {
       console.log(chalk.green('✓ Connected to AxonStream gateway'));
       console.log(chalk.blue('ℹ Connection details:'));
       console.log(`  Gateway: ${chalk.cyan(url)}`);
-      console.log(`  Organization: ${chalk.cyan(tokenInfo.payload.organizationId)}`);
-      console.log(`  User: ${chalk.cyan(tokenInfo.payload.email || tokenInfo.payload.sub)}`);
-      console.log(`  Token expires: ${chalk.cyan(new Date(tokenInfo.payload.exp! * 1000).toLocaleString())}`);
+      console.log(`  Organization: ${chalk.cyan(organizationId)}`);
+      console.log(`  User: ${chalk.cyan(tokenInfo.payload?.email || tokenInfo.payload?.sub)}`);
+      console.log(`  Token expires: ${chalk.cyan(new Date((tokenInfo.payload?.exp || 0) * 1000).toLocaleString())}`);
 
       // Test basic functionality
       testBasicFunctionality(client);

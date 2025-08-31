@@ -1,5 +1,5 @@
-import { Controller, Post, Body, UseGuards, Get, HttpCode, HttpStatus } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import { Controller, Post, Body, UseGuards, Get, HttpCode, HttpStatus, Req, BadRequestException } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiBody } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
 import { LoginDto, RegisterDto, RefreshTokenDto } from './dto';
 import { LocalAuthGuard } from './guards/local-auth.guard';
@@ -39,6 +39,117 @@ export class AuthController {
   @ApiResponse({ status: 401, description: 'Invalid refresh token' })
   async refresh(@Body() refreshTokenDto: RefreshTokenDto) {
     return this.authService.refreshToken(refreshTokenDto.refreshToken);
+  }
+
+  @Public()
+  @Post('trial/start')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Start invisible trial - zero friction access',
+    description: 'Get immediate access to AxonStream without tokens. Just provide email for security validation.'
+  })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        email: {
+          type: 'string',
+          format: 'email',
+          example: 'user@example.com',
+          description: 'Email for trial session validation (prevents duplicate trials)'
+        }
+      },
+      required: ['email']
+    }
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Trial access granted - no token returned',
+    schema: {
+      type: 'object',
+      properties: {
+        accessGranted: { type: 'boolean', example: true },
+        trialInfo: {
+          type: 'object',
+          properties: {
+            sessionId: { type: 'string', example: 'trial_123' },
+            expiresAt: { type: 'string', format: 'date-time' },
+            message: { type: 'string', example: 'Trial access granted! You can now use AxonStream immediately.' },
+            limitations: {
+              type: 'array',
+              items: { type: 'string' },
+              example: ['7-day trial period', 'Limited to 10 channels', 'Max 1000 events per day']
+            },
+            features: {
+              type: 'array',
+              items: { type: 'string' },
+              example: ['Real-time event streaming', 'WebSocket connections', 'Event publishing/subscribing']
+            },
+            nextSteps: {
+              type: 'object',
+              properties: {
+                docs: { type: 'string', example: 'https://docs.axonstream.ai' },
+                examples: { type: 'string', example: 'https://github.com/axonstream/examples' },
+                upgrade: { type: 'string', example: '/auth/register' }
+              }
+            }
+          }
+        }
+      }
+    }
+  })
+  @ApiResponse({ status: 400, description: 'Invalid email provided' })
+  @ApiResponse({ status: 500, description: 'Failed to setup trial environment' })
+  async startInvisibleTrial(@Body() body: { email: string }, @Req() req: any) {
+    const { email } = body;
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!email || !emailRegex.test(email)) {
+      throw new BadRequestException('Valid email address is required');
+    }
+
+    const ipAddress = req.ip || req.connection.remoteAddress || 'unknown';
+    const userAgent = req.headers['user-agent'] || 'unknown';
+
+    return this.authService.generateTrialAccess(email, ipAddress, userAgent);
+  }
+
+  @Public()
+  @Post('trial')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Get trial token - legacy endpoint',
+    description: 'Generate a 7-day trial token for immediate access to AxonStream. Use /trial/start for invisible trial.'
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Trial token generated successfully',
+    schema: {
+      type: 'object',
+      properties: {
+        token: { type: 'string', example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...' },
+        expiresIn: { type: 'string', example: '7d' },
+        trialInfo: {
+          type: 'object',
+          properties: {
+            organizationId: { type: 'string', example: 'trial_org_123' },
+            organizationSlug: { type: 'string', example: 'trial' },
+            userId: { type: 'string', example: 'trial_1234567890_abc123' },
+            expiresAt: { type: 'string', format: 'date-time' },
+            limitations: {
+              type: 'array',
+              items: { type: 'string' },
+              example: ['7-day trial period', 'Limited to 10 channels', 'Max 1000 events per day']
+            }
+          }
+        }
+      }
+    }
+  })
+  @ApiResponse({ status: 500, description: 'Failed to generate trial token' })
+  async getTrialToken() {
+    return this.authService.generateTrialToken();
   }
 
   @Get('profile')

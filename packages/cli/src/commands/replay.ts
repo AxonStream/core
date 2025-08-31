@@ -55,7 +55,8 @@ export async function replayCommand(channel: string, options?: any) {
                     replayOptions.replay_count = parseInt(options.count, 10);
                 }
 
-                await client.replay(channel, replayOptions.replay_from, replayOptions.replay_count);
+                // Use subscribe with replay options instead of non-existent replay method
+                await client.subscribe([channel], replayOptions);
                 replaying = true;
 
                 spinner.succeed('Event replay started!');
@@ -64,7 +65,8 @@ export async function replayCommand(channel: string, options?: any) {
                 console.log(chalk.green('✓ Replaying events'));
                 console.log(chalk.blue('ℹ Replay details:'));
                 console.log(`  Channel: ${chalk.cyan(channel)}`);
-                console.log(`  Organization: ${chalk.cyan(tokenInfo.payload.organizationId)}`);
+                const organizationId = tokenInfo.payload?.organizationId || tokenInfo.payload?.orgId;
+                console.log(`  Organization: ${chalk.cyan(organizationId)}`);
 
                 if (options.since) {
                     console.log(`  Since: ${chalk.cyan(options.since)}`);

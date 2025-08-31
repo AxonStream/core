@@ -65,18 +65,19 @@ model Organization {
   updatedAt   DateTime @updatedAt
 
   // Relations
-  users         User[]
-  connections   AxonPulsConnection[]
-  events        AxonPulsEvent[]
-  channels      AxonPulsChannel[]
-  subscriptions AxonPulsSubscription[]
-  auditLogs     AuditLog[]
-  roles         Role[]
-  quotas        TenantQuota?
-  sessions      Session[]
-  encryption    TenantEncryption?
-  magicRooms    MagicRoom[]
-  magicEvents   MagicEvent[]
+  users          User[]
+  connections    AxonPulsConnection[]
+  events         AxonPulsEvent[]
+  channels       AxonPulsChannel[]
+  subscriptions  AxonPulsSubscription[]
+  auditLogs      AuditLog[]
+  roles          Role[]
+  quotas         TenantQuota?
+  sessions       Session[]
+  trialSessions  TrialSession[]
+  encryption     TenantEncryption?
+  magicRooms     MagicRoom[]
+  magicEvents    MagicEvent[]
   magicPresences MagicPresence[]
 
   @@map("organizations")
@@ -84,49 +85,49 @@ model Organization {
 
 // User model
 model User {
-  id             String   @id @default(cuid())
-  email          String   @unique
-  username       String?  @unique
-  firstName      String?
-  lastName       String?
-  avatar         String?
-  passwordHash   String   // Added for authentication
-  isActive       Boolean  @default(true)
-  isEmailVerified Boolean @default(false)
+  id                     String    @id @default(cuid())
+  email                  String    @unique
+  username               String?   @unique
+  firstName              String?
+  lastName               String?
+  avatar                 String?
+  passwordHash           String // Added for authentication
+  isActive               Boolean   @default(true)
+  isEmailVerified        Boolean   @default(false)
   emailVerificationToken String?
-  passwordResetToken String?
-  passwordResetExpires DateTime?
-  lastLoginAt    DateTime?
-  failedLoginAttempts Int @default(0)
-  lockedUntil    DateTime?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  passwordResetToken     String?
+  passwordResetExpires   DateTime?
+  lastLoginAt            DateTime?
+  failedLoginAttempts    Int       @default(0)
+  lockedUntil            DateTime?
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
 
   // Multi-tenant
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   // Relations
-  connections    AxonPulsConnection[]
-  events         AxonPulsEvent[]
-  subscriptions  AxonPulsSubscription[]
-  auditLogs      AuditLog[]
-  userRoles      UserRole[]
-  sessions       Session[]
+  connections   AxonPulsConnection[]
+  events        AxonPulsEvent[]
+  subscriptions AxonPulsSubscription[]
+  auditLogs     AuditLog[]
+  userRoles     UserRole[]
+  sessions      Session[]
 
   @@map("users")
 }
 
 // Core AxonPuls Connection model
 model AxonPulsConnection {
-  id            String            @id @default(cuid())
-  sessionId     String            @unique
-  clientType    ClientType
-  status        ConnectionStatus  @default(CONNECTED)
-  channels      String[]          // Array of subscribed channels
-  metadata      Json?
-  connectedAt   DateTime          @default(now())
-  lastHeartbeat DateTime          @default(now())
+  id             String           @id @default(cuid())
+  sessionId      String           @unique
+  clientType     ClientType
+  status         ConnectionStatus @default(CONNECTED)
+  channels       String[] // Array of subscribed channels
+  metadata       Json?
+  connectedAt    DateTime         @default(now())
+  lastHeartbeat  DateTime         @default(now())
   disconnectedAt DateTime?
 
   // Multi-tenant isolation
@@ -134,11 +135,11 @@ model AxonPulsConnection {
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   // Optional user association
-  userId         String?
-  user           User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   // Relations
-  events         AxonPulsEvent[]
+  events AxonPulsEvent[]
 
   @@index([organizationId, status])
   @@index([sessionId])
@@ -148,27 +149,27 @@ model AxonPulsConnection {
 
 // Core AxonPuls Event model
 model AxonPulsEvent {
-  id            String   @id @default(cuid())
-  eventType     String
-  channel       String
-  payload       Json
-  acknowledgment Boolean  @default(false)
-  retryCount    Int      @default(0)
-  processed     Boolean  @default(false)
-  createdAt     DateTime @default(now())
-  processedAt   DateTime?
-  metadata      Json?
+  id             String    @id @default(cuid())
+  eventType      String
+  channel        String
+  payload        Json
+  acknowledgment Boolean   @default(false)
+  retryCount     Int       @default(0)
+  processed      Boolean   @default(false)
+  createdAt      DateTime  @default(now())
+  processedAt    DateTime?
+  metadata       Json?
 
   // Multi-tenant isolation
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   // Optional associations
-  connectionId   String?
-  connection     AxonPulsConnection? @relation(fields: [connectionId], references: [id], onDelete: SetNull)
+  connectionId String?
+  connection   AxonPulsConnection? @relation(fields: [connectionId], references: [id], onDelete: SetNull)
 
-  userId         String?
-  user           User?           @relation(fields: [userId], references: [id], onDelete: SetNull)
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   @@index([organizationId, eventType])
   @@index([channel, createdAt])
@@ -183,8 +184,8 @@ model AxonPulsChannel {
   name        String
   type        ChannelType
   description String?
-  permissions Json?       // Channel-specific permissions
-  settings    Json?       // Channel configuration
+  permissions Json? // Channel-specific permissions
+  settings    Json? // Channel configuration
   isActive    Boolean     @default(true)
   subscribers Int         @default(0)
   createdAt   DateTime    @default(now())
@@ -205,24 +206,24 @@ model AuditLog {
   id             String        @id @default(cuid())
   organizationId String
   userId         String?
-  action         String        // CREATE, READ, UPDATE, DELETE, LOGIN, LOGOUT, etc.
-  resourceType   String        // User, Connection, Event, Channel, etc.
+  action         String // CREATE, READ, UPDATE, DELETE, LOGIN, LOGOUT, etc.
+  resourceType   String // User, Connection, Event, Channel, etc.
   resourceId     String?
-  oldValues      Json?         // Previous state for updates
-  newValues      Json?         // New state for creates/updates
+  oldValues      Json? // Previous state for updates
+  newValues      Json? // New state for creates/updates
   success        Boolean       @default(true)
-  error          String?       // Error message if failed
+  error          String? // Error message if failed
   ipAddress      String?
   userAgent      String?
   sessionId      String?
   timestamp      DateTime      @default(now())
   severity       AuditSeverity @default(LOW)
   category       AuditCategory @default(DATA_ACCESS)
-  metadata       Json?         // Additional context
+  metadata       Json? // Additional context
 
   // Multi-tenant isolation
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  user           User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   @@index([organizationId, timestamp])
   @@index([organizationId, category, timestamp])
@@ -233,23 +234,23 @@ model AuditLog {
 
 // Role-based access control
 model Role {
-  id             String   @id @default(cuid())
-  name           String   // admin, user, viewer, etc.
-  description    String?
-  permissions    String[] // Array of permission strings
-  level          RoleLevel @default(VIEWER) // Role hierarchy level
-  isSystem       Boolean  @default(false) // System roles cannot be deleted
-  isActive       Boolean  @default(true)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-  createdBy      String?  // User ID who created this role
+  id          String    @id @default(cuid())
+  name        String // admin, user, viewer, etc.
+  description String?
+  permissions String[] // Array of permission strings
+  level       RoleLevel @default(VIEWER) // Role hierarchy level
+  isSystem    Boolean   @default(false) // System roles cannot be deleted
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  createdBy   String? // User ID who created this role
 
   // Multi-tenant isolation
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   // Relations
-  userRoles      UserRole[]
+  userRoles UserRole[]
 
   @@unique([organizationId, name])
   @@index([organizationId])
@@ -267,18 +268,18 @@ enum RoleLevel {
 
 // User role assignments
 model UserRole {
-  id        String   @id @default(cuid())
-  userId    String
-  roleId    String
-  assignedAt DateTime @default(now())
-  assignedBy String?  // User ID who assigned this role
+  id         String    @id @default(cuid())
+  userId     String
+  roleId     String
+  assignedAt DateTime  @default(now())
+  assignedBy String? // User ID who assigned this role
   expiresAt  DateTime?
-  isActive   Boolean  @default(true)
-  scope      Json?    // Optional scope for role (e.g., specific projects, departments)
+  isActive   Boolean   @default(true)
+  scope      Json? // Optional scope for role (e.g., specific projects, departments)
 
   // Relations
-  user      User @relation(fields: [userId], references: [id], onDelete: Cascade)
-  role      Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
 
   @@unique([userId, roleId])
   @@index([userId])
@@ -289,35 +290,35 @@ model UserRole {
 
 // Tenant resource limits and quotas
 model TenantQuota {
-  id             String   @id @default(cuid())
-  organizationId String   @unique
+  id             String @id @default(cuid())
+  organizationId String @unique
 
   // Resource limits
-  maxUsers       Int      @default(100)
-  maxConnections Int      @default(1000)
-  maxEvents      Int      @default(10000)
-  maxChannels    Int      @default(100)
-  maxStorage     BigInt   @default(1073741824) // 1GB in bytes
-  maxApiCalls    Int      @default(10000) // per hour
+  maxUsers       Int    @default(100)
+  maxConnections Int    @default(1000)
+  maxEvents      Int    @default(10000)
+  maxChannels    Int    @default(100)
+  maxStorage     BigInt @default(1073741824) // 1GB in bytes
+  maxApiCalls    Int    @default(10000) // per hour
 
   // Feature flags
-  features       String[] // Array of enabled features
+  features String[] // Array of enabled features
 
   // Usage tracking
-  currentUsers       Int @default(0)
-  currentConnections Int @default(0)
-  currentEvents      Int @default(0)
-  currentChannels    Int @default(0)
+  currentUsers       Int    @default(0)
+  currentConnections Int    @default(0)
+  currentEvents      Int    @default(0)
+  currentChannels    Int    @default(0)
   currentStorage     BigInt @default(0)
-  currentApiCalls    Int @default(0)
+  currentApiCalls    Int    @default(0)
 
   // Timestamps
-  lastResetAt    DateTime @default(now())
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  lastResetAt DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   // Relations
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@index([organizationId])
   @@map("tenant_quotas")
@@ -337,8 +338,8 @@ model Session {
   createdAt      DateTime @default(now())
 
   // Relations
-  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([organizationId])
@@ -347,20 +348,44 @@ model Session {
   @@map("sessions")
 }
 
+// Trial session management for temporary access
+model TrialSession {
+  id             String   @id @default(cuid())
+  email          String
+  userId         String?
+  organizationId String
+  ipAddress      String?
+  userAgent      String?
+  tokenHash      String
+  isActive       Boolean  @default(true)
+  expiresAt      DateTime
+  createdAt      DateTime @default(now())
+  metadata       Json?
+
+  // Relations
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([email])
+  @@index([organizationId])
+  @@index([isActive])
+  @@index([expiresAt])
+  @@map("trial_sessions")
+}
+
 // Tenant-specific encryption keys
 model TenantEncryption {
-  id             String   @id @default(cuid())
-  organizationId String   @unique
-  keyId          String   @unique
-  encryptedKey   String   // Encrypted with master key
-  algorithm      String   @default("AES-256-GCM")
-  keyVersion     Int      @default(1)
-  isActive       Boolean  @default(true)
-  createdAt      DateTime @default(now())
+  id             String    @id @default(cuid())
+  organizationId String    @unique
+  keyId          String    @unique
+  encryptedKey   String // Encrypted with master key
+  algorithm      String    @default("AES-256-GCM")
+  keyVersion     Int       @default(1)
+  isActive       Boolean   @default(true)
+  createdAt      DateTime  @default(now())
   rotatedAt      DateTime?
 
   // Relations
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@index([organizationId])
   @@index([keyId])
@@ -373,14 +398,14 @@ model AxonPulsSubscription {
   organizationId String
   userId         String
   channel        String
-  filters        Json?    // Subscription filters (event types, metadata, etc.)
+  filters        Json? // Subscription filters (event types, metadata, etc.)
   isActive       Boolean  @default(true)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
   // Multi-tenant isolation
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([organizationId, userId, channel])
   @@index([organizationId])
@@ -396,39 +421,39 @@ model AxonPulsSubscription {
 
 // Magic rooms for collaborative spaces
 model MagicRoom {
-  id              String   @id @default(cuid())
-  name            String   // Room identifier like "doc_123", "dashboard_main"
-  organizationId  String   // Multi-tenant isolation
-  config          Json     // Magic room configuration
-  pattern         String?  // URL pattern for auto-creation like "/docs/:docId"
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id             String   @id @default(cuid())
+  name           String // Room identifier like "doc_123", "dashboard_main"
+  organizationId String // Multi-tenant isolation
+  config         Json // Magic room configuration
+  pattern        String? // URL pattern for auto-creation like "/docs/:docId"
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   // Relations - connect to existing models
-  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  states          MagicState[]
-  snapshots       MagicSnapshot[]
-  events          MagicEvent[]
-  presences       MagicPresence[]
-  
-  @@unique([name, organizationId])  // Tenant isolation pattern
+  organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  states       MagicState[]
+  snapshots    MagicSnapshot[]
+  events       MagicEvent[]
+  presences    MagicPresence[]
+
+  @@unique([name, organizationId]) // Tenant isolation pattern
   @@index([organizationId])
   @@map("magic_rooms")
 }
 
 // Current state of magic objects
 model MagicState {
-  id              String   @id @default(cuid())
-  roomId          String
-  stateKey        String   // State identifier like "main", "todos", "dashboard"
-  currentState    Json     // Current collaborative object state
-  version         Int      @default(0)
-  lastModifiedBy  String   // User ID who last modified
-  lastModifiedAt  DateTime @default(now())
-  
+  id             String   @id @default(cuid())
+  roomId         String
+  stateKey       String // State identifier like "main", "todos", "dashboard"
+  currentState   Json // Current collaborative object state
+  version        Int      @default(0)
+  lastModifiedBy String // User ID who last modified
+  lastModifiedAt DateTime @default(now())
+
   // Relations
-  room            MagicRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
-  
+  room MagicRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
   @@unique([roomId, stateKey])
   @@index([roomId])
   @@map("magic_states")
@@ -436,21 +461,21 @@ model MagicState {
 
 // Time travel snapshots
 model MagicSnapshot {
-  id              String   @id @default(cuid())
-  roomId          String
-  stateKey        String
-  snapshotData    Json     // Complete state at this point in time
-  version         Int
-  operations      Json     // Operations that led to this state
-  createdAt       DateTime @default(now())
-  createdBy       String
-  description     String?
-  branchName      String   @default("main")
-  parentSnapshot  String?  // For branching support
-  
+  id             String   @id @default(cuid())
+  roomId         String
+  stateKey       String
+  snapshotData   Json // Complete state at this point in time
+  version        Int
+  operations     Json // Operations that led to this state
+  createdAt      DateTime @default(now())
+  createdBy      String
+  description    String?
+  branchName     String   @default("main")
+  parentSnapshot String? // For branching support
+
   // Relations
-  room            MagicRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
-  
+  room MagicRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
   @@index([roomId, stateKey])
   @@index([roomId, branchName])
   @@map("magic_snapshots")
@@ -458,19 +483,19 @@ model MagicSnapshot {
 
 // Magic events - connects to existing event system
 model MagicEvent {
-  id              String   @id @default(cuid())
-  roomId          String
-  eventType       String   @default("magic_events") 
-  payload         Json     // Magic operation details
-  organizationId  String   // Maintain tenant isolation
-  userId          String?
-  sessionId       String?
-  createdAt       DateTime @default(now())
-  
+  id             String   @id @default(cuid())
+  roomId         String
+  eventType      String   @default("magic_events")
+  payload        Json // Magic operation details
+  organizationId String // Maintain tenant isolation
+  userId         String?
+  sessionId      String?
+  createdAt      DateTime @default(now())
+
   // Relations - connect to existing models
-  room            MagicRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
-  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  
+  room         MagicRoom    @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
   @@index([roomId])
   @@index([organizationId])
   @@index([createdAt])
@@ -479,27 +504,27 @@ model MagicEvent {
 
 // Real-time presence tracking for collaboration
 model MagicPresence {
-  id              String   @id @default(cuid())
-  roomId          String
-  userId          String
-  sessionId       String
-  organizationId  String   // Multi-tenant isolation
-  userName        String   // Display name
-  userAvatar      String?  // Avatar URL
-  isActive        Boolean  @default(true)
-  lastSeen        DateTime @default(now())
-  cursorPosition  Json?    // Cursor coordinates {x, y, elementId}
-  selection       Json?    // Text selection {start, end, elementId}
-  viewportInfo    Json?    // Viewport data {scrollX, scrollY, zoom}
-  deviceInfo      Json?    // Device/browser info
-  metadata        Json?    // Additional presence data
-  joinedAt        DateTime @default(now())
-  
+  id             String   @id @default(cuid())
+  roomId         String
+  userId         String
+  sessionId      String
+  organizationId String // Multi-tenant isolation
+  userName       String // Display name
+  userAvatar     String? // Avatar URL
+  isActive       Boolean  @default(true)
+  lastSeen       DateTime @default(now())
+  cursorPosition Json? // Cursor coordinates {x, y, elementId}
+  selection      Json? // Text selection {start, end, elementId}
+  viewportInfo   Json? // Viewport data {scrollX, scrollY, zoom}
+  deviceInfo     Json? // Device/browser info
+  metadata       Json? // Additional presence data
+  joinedAt       DateTime @default(now())
+
   // Relations
-  room            MagicRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
-  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  
-  @@unique([roomId, sessionId])  // One presence per session per room
+  room         MagicRoom    @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([roomId, sessionId]) // One presence per session per room
   @@index([roomId])
   @@index([organizationId])
   @@index([userId])

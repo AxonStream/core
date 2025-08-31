@@ -74,7 +74,8 @@ export async function subscribeCommand(channels: string[], options?: any) {
                 console.log(chalk.green('✓ Listening for events'));
                 console.log(chalk.blue('ℹ Subscription details:'));
                 console.log(`  Channels: ${chalk.cyan(channels.join(', '))}`);
-                console.log(`  Organization: ${chalk.cyan(tokenInfo.payload.organizationId)}`);
+                const organizationId = tokenInfo.payload?.organizationId || tokenInfo.payload?.orgId;
+                console.log(`  Organization: ${chalk.cyan(organizationId)}`);
                 console.log(`  Output format: ${chalk.cyan(options.output || 'json')}`);
 
                 if (options.replayFrom) {

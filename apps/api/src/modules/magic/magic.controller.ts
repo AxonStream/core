@@ -148,14 +148,14 @@ export class MagicController {
         @CurrentTenant() context: TenantContext
     ) {
         const currentState = await this.magicService.getCurrentState(context, roomId);
-        const snapshotId = await this.timeTravelService.createSnapshot(
+        const snapshot = await this.timeTravelService.createSnapshot(
             context,
             roomId,
             currentState.currentState,
             currentState.version,
-            body.description,
-            body.branchName || 'main'
+            body.description
         );
+        const snapshotId = snapshot.id;
         return { snapshotId, message: 'Snapshot created successfully' };
     }
 
@@ -168,8 +168,8 @@ export class MagicController {
         @Param('snapshotId') snapshotId: string,
         @CurrentTenant() context: TenantContext
     ) {
-        const result = await this.timeTravelService.replayToSnapshot(context, roomId, snapshotId);
-        return { message: 'State reverted successfully', version: result.version };
+        const result = await this.timeTravelService.revertToSnapshot(context, roomId, snapshotId);
+        return { message: 'State reverted successfully', version: result.snapshot?.version || 0 };
     }
 
     @Get('rooms/:roomId/timeline')
@@ -180,7 +180,7 @@ export class MagicController {
         @Param('roomId') roomId: string,
         @CurrentTenant() context: TenantContext
     ) {
-        const timeline = await this.timeTravelService.getTimeline(context, roomId);
+        const timeline = await this.timeTravelService.getSnapshotHistory(context, roomId);
         return { timeline };
     }
 
@@ -210,7 +210,7 @@ export class MagicController {
         @Param('roomId') roomId: string,
         @CurrentTenant() context: TenantContext
     ) {
-        const branches = await this.timeTravelService.listBranches(context, roomId);
+        const branches = await this.timeTravelService.getBranches(context, roomId);
         return { branches };
     }
 
@@ -227,12 +227,11 @@ export class MagicController {
         },
         @CurrentTenant() context: TenantContext
     ) {
-        const result = await this.timeTravelService.mergeBranches(
+        const result = await this.timeTravelService.mergeBranch(
             context,
             roomId,
             body.sourceBranch,
-            body.targetBranch,
-            body.mergeStrategy || 'auto'
+            body.targetBranch
         );
         return result;
     }
@@ -308,7 +307,7 @@ export class MagicController {
         ]);
 
         const criticalAlerts = alerts.filter(a => a.severity === 'critical');
-        const warningAlerts = alerts.filter(a => a.severity === 'warning');
+        const warningAlerts = alerts.filter(a => a.severity === 'medium');
 
         let status: 'healthy' | 'warning' | 'critical' = 'healthy';
         if (criticalAlerts.length > 0) {

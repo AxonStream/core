@@ -1,6 +1,8 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { RedisService } from './redis.service';
+import { DeliveryGuaranteeService } from './delivery-guarantee.service';
+import { TenantAwareService, TenantContext } from './tenant-aware.service';
 
 export interface AxonPulsEvent {
   id?: string;
@@ -9,6 +11,9 @@ export interface AxonPulsEvent {
   payload: any;
   sessionId?: string;
   organizationId?: string;
+  organizationSlug?: string;
+  features?: string[];
+  roles?: string[];
   userId?: string;
   acknowledgment: boolean;
   retryCount: number;
@@ -35,6 +40,8 @@ export class EventStreamService implements OnModuleInit {
   constructor(
     private redisService: RedisService,
     private configService: ConfigService,
+    private deliveryGuaranteeService: DeliveryGuaranteeService,
+    private tenantAwareService: TenantAwareService,
   ) {
     this.consumerGroup = this.configService.get<string>('redis.streams.consumerGroup');
     this.consumerName = this.configService.get<string>('redis.streams.consumerName');
@@ -103,6 +110,9 @@ export class EventStreamService implements OnModuleInit {
 
       // Also publish to pub/sub for real-time notifications
       await this.publishToChannel(event);
+
+      // 🚀 NEW: Trigger automatic webhook delivery
+      await this.triggerWebhookDelivery(event);
 
       return messageId;
     } catch (error) {
@@ -275,6 +285,87 @@ export class EventStreamService implements OnModuleInit {
       createdAt: fields.createdAt,
       metadata: fields.metadata,
     };
+  }
+
+  // ============================================================================
+  // WEBHOOK INTEGRATION
+  // ============================================================================
+
+  /**
+   * Automatically trigger webhook delivery for published events
+   * This connects the event publishing pipeline to the webhook system
+   */
+  private async triggerWebhookDelivery(event: AxonPulsEvent): Promise<void> {
+    try {
+      // Create tenant context for webhook delivery
+      const context: TenantContext = {
+        organizationId: event.organizationId,
+        organizationSlug: event.organizationSlug || '',
+        features: event.features || [],
+        roles: event.roles || [],
+        userId: event.userId,
+        permissions: [], // Will be populated by tenant service if needed
+      };
+
+      // Get all active webhook endpoints for this organization
+      const endpoints = await this.deliveryGuaranteeService.getDeliveryEndpoints(context);
+
+      if (endpoints.length === 0) {
+        this.logger.debug(`No webhook endpoints configured for org: ${event.organizationId}`);
+        return;
+      }
+
+      // Convert AxonPulsEvent to ReplayableEvent format for webhook delivery
+      const replayableEvent = {
+        id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        eventType: event.eventType,
+        channel: event.channel,
+        payload: event.payload,
+        metadata: event.metadata || {},
+        organizationId: event.organizationId,
+        organizationSlug: event.organizationSlug || '',
+        userId: event.userId,
+        createdAt: event.createdAt || new Date().toISOString(),
+        version: 1,
+        timestamp: event.createdAt || new Date().toISOString(),
+        sequenceNumber: 1,
+        checksum: event.id,
+      };
+
+      // Trigger webhook delivery for each endpoint
+      const deliveryPromises = endpoints.map(async (endpoint) => {
+        try {
+          const receipt = await this.deliveryGuaranteeService.deliverEvent(
+            context,
+            replayableEvent,
+            [endpoint.id]
+          );
+
+          this.logger.debug(
+            `Webhook delivery initiated: ${receipt[0]?.id} for endpoint ${endpoint.id}`
+          );
+
+          return receipt;
+        } catch (error) {
+          this.logger.error(
+            `Failed to deliver webhook to endpoint ${endpoint.id}: ${error?.message}`
+          );
+          // Don't throw - continue with other endpoints
+          return null;
+        }
+      });
+
+      // Wait for all webhook deliveries to be initiated (not completed)
+      await Promise.allSettled(deliveryPromises);
+
+      this.logger.debug(
+        `Webhook delivery initiated for ${endpoints.length} endpoints for event ${event.eventType}`
+      );
+
+    } catch (error) {
+      this.logger.error(`Failed to trigger webhook delivery: ${error?.message}`);
+      // Don't throw - webhook delivery failure shouldn't break event publishing
+    }
   }
 
   private shouldProcessEvent(event: AxonPulsEvent, subscription: EventSubscription): boolean {

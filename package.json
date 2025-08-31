@@ -13,13 +13,14 @@
     "build:fast": "tsup",
     "dev": "turbo run dev",
     "lint": "turbo run lint",
+    "local:pack:install": "node -e \"const cp=require('child_process'),fs=require('fs'),path=require('path');const pkg=process.env.npm_config_pkg||'packages/sdk';const app=process.env.npm_config_app||'apps/api';const dest='dist-tarballs';fs.mkdirSync(dest,{recursive:true});const json=cp.execSync(`npm --workspace=${pkg} pack --json --pack-destination=${dest}`,{encoding:'utf8'});const arr=JSON.parse(json);if(!Array.isArray(arr)||!arr[0]?.filename){throw new Error('Unexpected npm pack --json output: '+json);}const tar=path.join(dest,arr[0].filename);cp.execSync(`npm --workspace=${app} i ${tar}`,{stdio:'inherit'});console.log(`\\n✅ Installed ${tar} into ${app}\\n`);\"",
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",
     "check-types": "turbo run check-types",
     "build:test": "node scripts/build-test-all.js",
-    "build:packages": "npm run build --workspace=packages/sdk && npm run build --workspace=packages/react-hooks && npm run build --workspace=packages/cli",
+    "build:packages": "npm run build --workspace=packages/sdk && npm run build --workspace=packages/cli",
     "build:apps": "npm run build --workspace=apps/api && npm run build --workspace=apps/web && npm run build --workspace=apps/docs",
     "test:packages": "npm run build:packages && node scripts/build-test-all.js",
-    "typecheck:all": "npm run typecheck --workspace=packages/sdk && npm run typecheck --workspace=packages/react-hooks && npm run typecheck --workspace=packages/cli",
+    "typecheck:all": "npm run typecheck --workspace=packages/sdk && npm run typecheck --workspace=packages/cli",
     "build:sdk": "node scripts/build-sdk-production.js",
     "publish:sdk": "npm run build:sdk && cd packages/sdk && npm publish",
     "docs:publish": "node scripts/publish-docs.js",
@@ -27,9 +28,9 @@
     "docs:deploy-pages": "node scripts/deploy-github-pages.js",
     "install:all": "npm install --workspaces",
     "pack:all": "npm run build && npm run pack:packages",
-    "pack:packages": "cd packages/sdk && npm pack --pack-destination ../../dist-tarballs && cd ../react-hooks && npm pack --pack-destination ../../dist-tarballs && cd ../cli && npm pack --pack-destination ../../dist-tarballs",
+    "pack:packages": "cd packages/sdk && npm pack --pack-destination ../../dist-tarballs && cd ../cli && npm pack --pack-destination ../../dist-tarballs",
     "publish:all": "npm run pack:all && npm run publish:packages",
-    "publish:packages": "cd packages/sdk && npm publish && cd ../react-hooks && npm publish && cd ../cli && npm publish",
+    "publish:packages": "cd packages/sdk && npm publish && cd ../cli && npm publish",
     "release": "npm run build && npm run pack:all && npm run publish:packages",
     "one-command": "npm run release && echo '🎉 AxonStream packages published successfully!'"
   },
@@ -49,5 +50,6 @@
   ],
   "dependencies": {
     "socket.io-client": "^4.8.1"
-  }
+  },
+  "private": "true"
 }

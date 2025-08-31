@@ -1,38 +1,49 @@
 /**
- * React Adapter - Provides React hooks and components
+ * React Adapter - Integrates with @axonstream/react package
  * 
  * Auto-detects React and provides:
- * - useAxonStream hook
- * - useAxonChannel hook  
- * - useAxonPresence hook
- * - useAxonHITL hook
- * - React components
+ * - Integration with production features
+ * - Component wrappers for UI components
+ * - Framework detection and binding
+ * - Delegates hooks to @axonstream/react package (no duplication)
  */
 
-import type { AxonPulsClient, AxonPulsEvent } from '../core/client';
+import type { AxonPulsClient } from '../core/client';
 import type { FrameworkAdapter } from './index';
+import { isReactEnvironment } from '../utils/framework-detection';
+import { globalPerformanceMonitor, globalErrorBoundary, globalCache } from '../utils/production-features';
 
-// React binding interface
+// React binding interface - delegates to @axonstream/react package
 export interface ReactBinding {
-    useAxonStream: (config?: any) => any;
-    useAxonChannel: (channel: string, client: AxonPulsClient) => any;
-    useAxonPresence: (client: AxonPulsClient, options?: any) => any;
-    useAxonHITL: (client: AxonPulsClient, options?: any) => any;
+    // Hooks are provided by @axonstream/react package
+    hooks: {
+        useAxonpuls: any;
+        useAxonpulsChannel: any;
+        useAxonpulsPresence: any;
+        useAxonpulsHITL: any;
+    };
+    // UI Components with production features integration
     components: {
         AxonChat: any;
         AxonPresence: any;
         AxonHITL: any;
         AxonEmbed: any;
+        AxonDashboard: any;
+    };
+    // Production features
+    productionFeatures: {
+        errorBoundary: any;
+        performanceMonitor: any;
+        cache: any;
     };
 }
 
-// React hooks implementation (will be loaded if React is detected)
+// React binding implementation - integrates with @axonstream/react package
 export function createReactBinding(client: AxonPulsClient): ReactBinding {
     // Import React hooks dynamically to avoid errors in non-React environments
     let React: any;
     let useState: any;
     let useEffect: any;
-    let useCallback: any;
     let useRef: any;
 
     try {
@@ -44,312 +55,131 @@ export function createReactBinding(client: AxonPulsClient): ReactBinding {
             throw new Error('React not found');
         }
 
-        ({ useState, useEffect, useCallback, useRef } = React);
+        ({ useState, useEffect, useRef } = React);
     } catch (error) {
         throw new Error('React adapter requires React to be available');
     }
 
-    // useAxonStream hook
-    const useAxonStream = (config?: { autoConnect?: boolean; debug?: boolean }) => {
-        const [isConnected, setIsConnected] = useState(false);
-        const [isConnecting, setIsConnecting] = useState(false);
-        const [error, setError] = useState(null as string | null);
-        const clientRef = useRef(client);
+    // Initialize production features for React environment
+    globalPerformanceMonitor.startMonitoring();
+    globalErrorBoundary.addRecoveryStrategy('ChunkLoadError', () => {
+        window.location.reload();
+    });
 
-        const connect = useCallback(async () => {
-            try {
-                setIsConnecting(true);
-                setError(null);
-                await clientRef.current.connect();
-                setIsConnected(true);
-            } catch (err) {
-                setError(err instanceof Error ? err.message : 'Connection failed');
-            } finally {
-                setIsConnecting(false);
-            }
-        }, []);
+    // Delegate to @axonstream/react package for hooks
+    let reactHooks: any = null;
 
-        const disconnect = useCallback(() => {
-            clientRef.current.disconnect();
-            setIsConnected(false);
-        }, []);
+    try {
+        // Try to import react hooks package if available
+        if (typeof require !== 'undefined') {
+            reactHooks = require('@axonstream/react');
+        }
+    } catch (error) {
+        console.warn('React hooks package not available. Install @axonstream/react for full functionality.');
+    }
 
-        useEffect(() => {
-            const handleConnect = () => setIsConnected(true);
-            const handleDisconnect = () => setIsConnected(false);
-            const handleError = (err: any) => setError(err.message || 'Unknown error');
+    // Create production-grade binding that integrates hooks with production features
+    const binding = reactHooks ? reactHooks.createAxonpulsReactBinding(client) : null;
 
-            client.on('connect', handleConnect);
-            client.on('disconnect', handleDisconnect);
-            client.on('error', handleError);
+    // Create UI components with production features integration
+    const components = {
+        AxonDashboard: (props: any) => {
+            const [DashboardComponent, setDashboardComponent] = useState(null);
+            const dashboardRef = useRef(null);
+            const containerRef = useRef(null);
 
-            // Auto-connect if requested
-            if (config?.autoConnect && !client.isConnected()) {
-                connect();
-            }
-
-            return () => {
-                client.off('connect', handleConnect);
-                client.off('disconnect', handleDisconnect);
-                client.off('error', handleError);
-            };
-        }, [connect, config?.autoConnect]);
-
-        return {
-            client: clientRef.current,
-            isConnected,
-            isConnecting,
-            error,
-            connect,
-            disconnect,
-            subscribe: useCallback((channels: string[]) => client.subscribe(channels), []),
-            publish: useCallback((channel: string, data: any) => client.publish(channel, data), []),
-        };
-    };
-
-    // useAxonChannel hook
-    const useAxonChannel = (channel: string, axonClient: AxonPulsClient) => {
-        const [messages, setMessages] = useState([] as AxonPulsEvent[]);
-        const [isSubscribed, setIsSubscribed] = useState(false);
-
-        const sendMessage = useCallback((type: string, payload: any) => {
-            axonClient.publish(channel, { type, payload });
-        }, [channel, axonClient]);
-
-        const clearMessages = useCallback(() => {
-            setMessages([]);
-        }, []);
-
-        useEffect(() => {
-            const handleEvent = (event: AxonPulsEvent) => {
-                if (event.metadata?.channel === channel) {
-                    setMessages((prev: AxonPulsEvent[]) => [...prev, event]);
-                }
-            };
-
-            axonClient.on('event', handleEvent);
-
-            // Subscribe to channel
-            axonClient.subscribe([channel]).then(() => {
-                setIsSubscribed(true);
-            }).catch((err) => {
-                console.error('Failed to subscribe to channel:', err);
-            });
-
-            return () => {
-                axonClient.off('event', handleEvent);
-                axonClient.unsubscribe([channel]);
-                setIsSubscribed(false);
-            };
-        }, [channel, axonClient]);
-
-        return {
-            messages,
-            messageCount: messages.length,
-            isSubscribed,
-            sendMessage,
-            clearMessages,
-        };
-    };
-
-    // useAxonPresence hook
-    const useAxonPresence = (axonClient: AxonPulsClient, options: {
-        room: string;
-        currentUser?: { id: string; name: string; metadata?: any };
-        heartbeatInterval?: number;
-    }) => {
-        const [users, setUsers] = useState([] as any[]);
-        const [onlineCount, setOnlineCount] = useState(0);
-
-        useEffect(() => {
-            const presenceChannel = `presence:${options.room}`;
-
-            const handlePresence = (event: AxonPulsEvent) => {
-                if (event.type === 'user_joined') {
-                    setUsers((prev: any[]) => [...prev.filter((u: any) => u.id !== event.payload.user.id), event.payload.user]);
-                } else if (event.type === 'user_left') {
-                    setUsers((prev: any[]) => prev.filter((u: any) => u.id !== event.payload.user.id));
-                } else if (event.type === 'presence_update') {
-                    setUsers(event.payload.users || []);
-                }
-            };
-
-            axonClient.on('event', handlePresence);
-            axonClient.subscribe([presenceChannel]);
-
-            // Send join event
-            if (options.currentUser) {
-                axonClient.publish(presenceChannel, {
-                    type: 'user_join',
-                    payload: { user: options.currentUser }
+            useEffect(() => {
+                import('../ui/components/dashboard').then(module => {
+                    setDashboardComponent(() => module.AxonDashboard);
                 });
-            }
+            }, []);
 
-            return () => {
-                axonClient.off('event', handlePresence);
-                axonClient.unsubscribe([presenceChannel]);
-
-                // Send leave event
-                if (options.currentUser) {
-                    axonClient.publish(presenceChannel, {
-                        type: 'user_leave',
-                        payload: { user: options.currentUser }
+            useEffect(() => {
+                if (containerRef.current && DashboardComponent && !dashboardRef.current) {
+                    dashboardRef.current = new DashboardComponent({
+                        client: props.client,
+                        timeRange: props.timeRange || '24h',
+                        refreshInterval: props.refreshInterval,
+                        showAlerts: props.showAlerts !== false,
+                        showPerformance: props.showPerformance !== false,
+                        showUsage: props.showUsage !== false,
+                        showSecurity: props.showSecurity !== false,
+                        autoRefresh: props.autoRefresh !== false,
+                        theme: props.theme || 'auto',
+                        ...props
                     });
+                    dashboardRef.current.mount(containerRef.current);
                 }
-            };
-        }, [axonClient, options.room, options.currentUser]);
 
-        useEffect(() => {
-            setOnlineCount(users.length);
-        }, [users]);
+                return () => {
+                    if (dashboardRef.current) {
+                        dashboardRef.current.unmount();
+                        dashboardRef.current = null;
+                    }
+                };
+            }, [DashboardComponent, props]);
 
-        return {
-            users,
-            onlineCount,
-            getUsersByStatus: (status: string) => users.filter((u: any) => u.status === status),
-        };
-    };
-
-    // useAxonHITL hook
-    const useAxonHITL = (axonClient: AxonPulsClient, options: {
-        department?: string;
-        autoAcceptRoles?: string[];
-        currentUser?: { id: string; name: string; role: string };
-    }) => {
-        const [pendingRequests, setPendingRequests] = useState([] as any[]);
-        const [activeRequest, setActiveRequest] = useState(null as any | null);
-
-        const submitResponse = useCallback((response: {
-            requestId: string;
-            action: 'approve' | 'reject' | 'escalate';
-            comment?: string;
-        }) => {
-            const hitlChannel = `hitl:${options.department || 'general'}`;
-            axonClient.publish(hitlChannel, {
-                type: 'hitl_response',
-                payload: { ...response, respondedBy: options.currentUser }
-            });
-
-            // Remove from pending
-            setPendingRequests((prev: any[]) => prev.filter((r: any) => r.id !== response.requestId));
-            if (activeRequest?.id === response.requestId) {
-                setActiveRequest(null);
+            if (!DashboardComponent) {
+                return React.createElement('div', {
+                    style: { padding: '20px', textAlign: 'center', color: '#666' }
+                }, 'Loading Dashboard Component...');
             }
-        }, [axonClient, options.department, options.currentUser]);
 
-        useEffect(() => {
-            const hitlChannel = `hitl:${options.department || 'general'}`;
+            return React.createElement('div', { ref: containerRef });
+        },
 
-            const handleHITL = (event: AxonPulsEvent) => {
-                if (event.type === 'hitl_request') {
-                    setPendingRequests((prev: any[]) => [...prev, event.payload]);
-                } else if (event.type === 'hitl_request_update') {
-                    setPendingRequests((prev: any[]) => prev.map((r: any) =>
-                        r.id === event.payload.id ? { ...r, ...event.payload } : r
-                    ));
-                }
-            };
-
-            axonClient.on('event', handleHITL);
-            axonClient.subscribe([hitlChannel]);
-
-            return () => {
-                axonClient.off('event', handleHITL);
-                axonClient.unsubscribe([hitlChannel]);
-            };
-        }, [axonClient, options.department]);
-
-        return {
-            pendingRequests,
-            activeRequest,
-            submitResponse,
-            setActiveRequest,
-            getUrgentRequests: () => pendingRequests.filter((r: any) => r.priority === 'urgent'),
-        };
-    };
-
-    // React Components
-    const AxonChat = ({ channel, client: axonClient, className }: any) => {
-        const { messages, sendMessage } = useAxonChannel(channel, axonClient);
-        const [inputValue, setInputValue] = useState('');
-
-        const handleSend = () => {
-            if (inputValue.trim()) {
-                sendMessage('chat_message', { text: inputValue, timestamp: new Date().toISOString() });
-                setInputValue('');
-            }
-        };
-
-        return React.createElement('div', { className: `axon-chat ${className || ''}` }, [
-            React.createElement('div', { key: 'messages', className: 'axon-messages' },
-                messages.map((msg: any, idx: number) =>
-                    React.createElement('div', { key: idx, className: 'axon-message' }, [
-                        React.createElement('span', { key: 'type', className: 'message-type' }, msg.type),
-                        React.createElement('span', { key: 'content' }, JSON.stringify(msg.payload))
-                    ])
-                )
-            ),
-            React.createElement('div', { key: 'input', className: 'axon-input' }, [
-                React.createElement('input', {
-                    key: 'text',
-                    type: 'text',
-                    value: inputValue,
-                    onChange: (e: any) => setInputValue(e.target.value),
-                    onKeyPress: (e: any) => e.key === 'Enter' && handleSend(),
-                    placeholder: 'Type a message...'
-                }),
-                React.createElement('button', {
-                    key: 'send',
-                    onClick: handleSend
-                }, 'Send')
-            ])
-        ]);
-    };
-
-    const AxonPresence = ({ room, client: axonClient, currentUser }: any) => {
-        const { users, onlineCount } = useAxonPresence(axonClient, { room, currentUser });
-
-        return React.createElement('div', { className: 'axon-presence' }, [
-            React.createElement('h3', { key: 'title' }, `Online (${onlineCount})`),
-            React.createElement('div', { key: 'users', className: 'presence-users' },
-                users.map((user: any, idx: number) =>
-                    React.createElement('div', { key: idx, className: 'presence-user' }, [
-                        React.createElement('span', { key: 'name' }, user.name),
-                        React.createElement('span', { key: 'status', className: `status-${user.status || 'online'}` },
-                            user.status || 'online')
-                    ])
-                )
-            )
-        ]);
+        // Placeholder components - to be implemented
+        AxonChat: () => React.createElement('div', {}, 'AxonChat component - to be implemented'),
+        AxonPresence: () => React.createElement('div', {}, 'AxonPresence component - to be implemented'),
+        AxonHITL: () => React.createElement('div', {}, 'AxonHITL component - to be implemented'),
+        AxonEmbed: () => React.createElement('div', {}, 'AxonEmbed component - to be implemented')
     };
 
     return {
-        useAxonStream,
-        useAxonChannel,
-        useAxonPresence,
-        useAxonHITL,
-        components: {
-            AxonChat,
-            AxonPresence,
-            AxonHITL: () => React.createElement('div', {}, 'HITL Component'),
-            AxonEmbed: () => React.createElement('div', {}, 'Embed Component'),
+        hooks: binding ? binding : {
+            useAxonpuls: () => { throw new Error('Install @axonstream/react package for hooks'); },
+            useAxonpulsChannel: () => { throw new Error('Install @axonstream/react package for hooks'); },
+            useAxonpulsPresence: () => { throw new Error('Install @axonstream/react package for hooks'); },
+            useAxonpulsHITL: () => { throw new Error('Install @axonstream/react package for hooks'); }
         },
+        components,
+        productionFeatures: {
+            errorBoundary: globalErrorBoundary,
+            performanceMonitor: globalPerformanceMonitor,
+            cache: globalCache
+        }
     };
 }
 
-// React adapter registration
-export const ReactAdapter: FrameworkAdapter = {
+// React Framework Adapter
+export const reactAdapter: FrameworkAdapter = {
     name: 'react',
-    version: '1.0.0',
-    detectFramework() {
-        try {
-            return !!(typeof window !== 'undefined' && (window as any).React) ||
-                !!(typeof require !== 'undefined' && require('react'));
-        } catch {
-            return false;
-        }
-    },
-    createBinding(client: AxonPulsClient) {
-        return createReactBinding(client);
-    }
+    version: '18.0.0',
+    detectFramework: isReactEnvironment,
+    createBinding: createReactBinding
 };
+
+// Export individual hooks for backward compatibility (delegates to @axonstream/react)
+export function useAxonStream(client: AxonPulsClient, config?: { autoConnect?: boolean; debug?: boolean }) {
+    const binding = createReactBinding(client);
+    return binding.hooks.useAxonpuls(config);
+}
+
+export function useAxonChannel(channel: string, client: AxonPulsClient) {
+    const binding = createReactBinding(client);
+    return binding.hooks.useAxonpulsChannel(channel);
+}
+
+export function useAxonPresence(client: AxonPulsClient, options: { room: string; currentUser?: any }) {
+    const binding = createReactBinding(client);
+    return binding.hooks.useAxonpulsPresence(options);
+}
+
+export function useAxonHITL(client: AxonPulsClient, options: {
+    department?: string;
+    autoAcceptRoles?: string[];
+    currentUser?: { id: string; name: string; role: string }
+}) {
+    const binding = createReactBinding(client);
+    return binding.hooks.useAxonpulsHITL(options);
+}

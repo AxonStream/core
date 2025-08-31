@@ -1,0 +1,16 @@
+{
+  "name": "axonstream-procurement-demo",
+  "version": "1.0.0",
+  "description": "Enterprise Procurement Demo using AxonStream",
+  "scripts": {
+    "start": "react-scripts start",
+    "simulate": "node procurement-simulator.js",
+    "demo": "npm run simulate & npm start"
+  },
+  "dependencies": {
+    "@axonstream/core": "^2.0.0",
+    "react": "^18.0.0",
+    "react-dom": "^18.0.0",
+    "react-scripts": "^5.0.0"
+  }
+}

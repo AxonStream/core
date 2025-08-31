@@ -1,134 +1,91 @@
 /**
- * @axonstream/core - ONE PACKAGE FOR EVERYTHING
+ * 🚀 AXONPULS SDK - Enterprise Real-Time Platform
  * 
- * Install once, everything works:
- * - Core SDK (connect, subscribe, publish, replay)
- * - React/Vue/Angular adapters (auto-detect & lazy load)  
- * - UI Components (headless + themed)
- * - Embed helper (AXONUI.mount)
- * - CDN build (global window access)
- * - Self-healing, multi-tenant, HITL
+ * The world's most advanced real-time collaboration platform
+ * Built for enterprise scale with Magic collaboration features
  * 
- * @example
- * ```typescript
- * import { createAxonStream } from '@axonstream/core';
- * 
- * // ONE COMMAND - ALL DONE
- * const axon = await createAxonStream({ org: 'my-org', token: 'jwt-token' });
- * await axon.connect();
- * ```
+ * @version 2.0.0
+ * @author AxonStreamAI
+ * @license MIT
  */
 
-// Import types and classes
-import { AxonPulsClient, createAxonPulsClient, type AxonPulsClientConfig } from './core/client';
-
-// Core SDK exports - Always available
+// Core Client
 export { AxonPulsClient } from './core/client';
+export type { AxonPulsClientConfig, AxonPulsEvent, SubscribeOptions, PublishOptions } from './core/client';
+
+// 🎯 MAGIC FACTORY FUNCTIONS - Zero-friction onboarding
+export { createAxonPulsClient, createTrialClient, createDemoClient, createMagicClient, createZeroConfigClient } from './factory';
+
+// 🎯 LEGACY COMPATIBILITY
+export { createAxonPulsClient as createAxonStream } from './factory';
+
+// Event Emitter (Fixed duplication)
+export { EventEmitter } from './core/event-emitter';
+export type { EventMap, DefaultEvents, EventListener } from './core/event-emitter';
+
+// Contracts & Schemas (Hardened UUID)
+export { generateUUID } from './core/contracts';
+
+// Magic Collaboration (Game-Changing Feature)
+export { MagicCollaboration } from './magic/magic-collaboration';
+export { MagicTimeTravel } from './magic/magic-time-travel';
+export { MagicPresence } from './magic/magic-presence';
 export type {
-  AxonPulsClientConfig,
-  AxonPulsEvent,
-  SubscribeOptions,
-  PublishOptions,
-  JwtPayload
-} from './core/client';
+  MagicOperation,
+  MagicState,
+  MagicRoom,
+  MagicSnapshot,
+  MagicBranch,
+  ConflictResolutionStrategy
+} from './magic/types';
 
-// Embed functionality - Temporarily disabled due to UI component dependency
-// TODO: Re-enable after fixing UI component class inheritance issue
-// export { AxonEmbed, mount as mountAxonUI } from './embed';
-// export type { EmbedConfig } from './embed';
+// Framework Detection & Adapters
+// Note: Universal adapter temporarily disabled due to complex type conflicts
+// export { createUniversalAdapter } from './framework/universal-adapter';
 
-// Framework Adapters - Auto-detect and lazy-load
+// Utilities & Helpers
 export {
-  detectFramework,
-  createFrameworkBinding,
-  createAxonStreamWithFramework
-} from './adapters/index';
-export type { FrameworkAdapter } from './adapters/index';
+  resolveApiUrl,
+  resolveAuthToken,
+  resolveApiKey,
+  resolveOrganization,
+  detectEnvironment
+} from './utils/helpers';
 
-// UI Components - Temporarily disabled to fix class inheritance issue
-// TODO: Fix AxonUIComponent bundling issue where class extends value undefined
-// export {
-//   AxonChat,
-//   AxonPresence,
-//   AxonHITL,
-//   AxonEmbed as AxonEmbedComponent,
-//   AxonNotifications,
-//   createChat,
-//   createPresence,
-//   createHITL,
-//   createEmbed,
-//   createNotifications,
-//   createUI,
-//   AxonUIBuilder,
-//   themes,
-//   getTheme
-// } from './ui/index';
-// export type {
-//   ComponentConfig,
-//   ChatConfig,
-//   PresenceConfig,
-//   HITLConfig,
-//   EmbedConfig as UIEmbedConfig
-// } from './ui/index';
+// Error Handling
+export { AxonPulsError, AxonPulsErrorCode } from './errors';
 
-// Enhanced factory function that matches REAL_PROJECT_PLAN.md  
-export function createAxonStream(config: { org: string; token: string; debug?: boolean }) {
-  const client = new AxonPulsClient({
-    url: `wss://${config.org}.axonstream.ai`,
-    token: config.token,
-    autoReconnect: true,
-    debug: config.debug || false
-  });
+// Configuration
+export { createMagicConfig, MagicConfigs } from './config/default-config';
+export { DEFAULT_UI_CONFIG, UIConfigManager } from './config/ui-config';
 
-  return {
-    client,
-    connect: () => client.connect(),
-    disconnect: () => client.disconnect(),
-    publish: (channel: string, data: any) => client.publish(channel, { type: 'event', payload: data }),
-    subscribe: (channels: string[]) => client.subscribe(channels),
-    on: (event: string, handler: (data: any) => void) => client.on(event, handler),
-    isConnected: () => client.isConnected(),
-    // Enhanced UI system with auto-framework detection
-    ui: {
-      render: (selector: string, type = 'chat', config = {}) => {
-        try {
-          const { createUI } = require('./ui');
-          const component = createUI(client, type, { channel: 'default', ...config });
-          component.mount(selector);
-          return component;
-        } catch (error) {
-          console.error('Failed to render UI component:', error);
-          throw error;
-        }
-      },
-      builder: () => {
-        const { AxonUIBuilder } = require('./ui');
-        return new AxonUIBuilder(client);
-      },
-      chat: (config: any) => {
-        const { createChat } = require('./ui');
-        return createChat({ client, ...config });
-      },
-      presence: (config: any) => {
-        const { createPresence } = require('./ui');
-        return createPresence({ client, ...config });
-      },
-      hitl: (config: any) => {
-        const { createHITL } = require('./ui');
-        return createHITL({ client, ...config });
-      },
-      embed: (config: any) => {
-        const { createEmbed } = require('./ui');
-        return createEmbed({ client, ...config });
-      }
-    },
-    // Framework adapter integration
-    framework: null // Will be populated by createFrameworkBinding
-  };
-}
+// Production Features
+export { ProductionErrorBoundary } from './utils/production-features';
 
-export { createAxonPulsClient };
-export const version = '1.0.0';
-export * from './core/client';
-export * from './core/contracts';
-export * from './errors/index';
+// Framework Adapters
+export { reactAdapter } from './adapters/react';
+export { VueAdapter } from './adapters/vue';
+export { AngularAdapter } from './adapters/angular';
+export type { ReactBinding } from './adapters/react';
+export type { VueBinding } from './adapters/vue';
+export type { AngularBinding } from './adapters/angular';
+
+// Framework Detection Utilities
+export {
+  detectAllFrameworks,
+  detectReact,
+  detectVue,
+  detectAngular,
+  detectSvelte,
+  isReactEnvironment,
+  isVueEnvironment,
+  isAngularEnvironment,
+  isSvelteEnvironment
+} from './utils/framework-detection';
+
+// CDN Build - Temporarily disabled due to missing factory functions
+// export { AxonSDK, createAxonStream } from './cdn';
+
+// Embed Components
+export { AxonEmbed, mount as createEmbedComponent } from './embed';
+export type { EmbedConfig } from './embed';

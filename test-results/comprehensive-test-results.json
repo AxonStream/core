@@ -1,0 +1,76 @@
+{
+  "timestamp": "2025-08-31T13:44:00.945Z",
+  "testSummary": {
+    "total": 3,
+    "passed": 2,
+    "failed": 1,
+    "duration": 125
+  },
+  "categories": {
+    "core": {
+      "tests": [
+        {
+          "name": "WebSocket Connection",
+          "status": "PASSED",
+          "duration": 63,
+          "result": {
+            "connected": true,
+            "url": "ws://localhost:3001",
+            "authenticated": true
+          },
+          "timestamp": "2025-08-31T13:44:01.012Z"
+        },
+        {
+          "name": "SDK Initialization",
+          "status": "PASSED",
+          "duration": 45,
+          "result": {
+            "clientInitialized": true,
+            "hasConnectMethod": true,
+            "hasSubscribeMethod": true,
+            "hasSendMethod": false,
+            "hasValidToken": true
+          },
+          "timestamp": "2025-08-31T13:44:01.058Z"
+        },
+        {
+          "name": "REST API Endpoints",
+          "status": "FAILED",
+          "duration": 11,
+          "error": "API endpoints failed: [\n  {\n    \"endpoint\": \"/health\",\n    \"status\": 404,\n    \"expected\": 200,\n    \"passed\": false,\n    \"responseTime\": \"N/A\"\n  },\n  {\n    \"endpoint\": \"/api/v1/health\",\n    \"status\": 404,\n    \"expected\": 200,\n    \"passed\": false,\n    \"responseTime\": \"N/A\"\n  },\n  {\n    \"endpoint\": \"/metrics\",\n    \"status\": 404,\n    \"expected\": 200,\n    \"passed\": false,\n    \"responseTime\": \"N/A\"\n  }\n]",
+          "stack": "Error: API endpoints failed: [\n  {\n    \"endpoint\": \"/health\",\n    \"status\": 404,\n    \"expected\": 200,\n    \"passed\": false,\n    \"responseTime\": \"N/A\"\n  },\n  {\n    \"endpoint\": \"/api/v1/health\",\n    \"status\": 404,\n    \"expected\": 200,\n    \"passed\": false,\n    \"responseTime\": \"N/A\"\n  },\n  {\n    \"endpoint\": \"/metrics\",\n    \"status\": 404,\n    \"expected\": 200,\n    \"passed\": false,\n    \"responseTime\": \"N/A\"\n  }\n]\n    at ComprehensiveTestSuite.testRESTAPIEndpoints (C:\\laragon\\www\\axonstream-core\\New folder\\axonpuls-protocol\\apix\\apix-uaui-protocol\\axon-puls-platform\\scripts\\comprehensive-testing-suite.js:205:19)\n    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at async ComprehensiveTestSuite.runTest (C:\\laragon\\www\\axonstream-core\\New folder\\axonpuls-protocol\\apix\\apix-uaui-protocol\\axon-puls-platform\\scripts\\comprehensive-testing-suite.js:59:28)\n    at async ComprehensiveTestSuite.runAllTests (C:\\laragon\\www\\axonstream-core\\New folder\\axonpuls-protocol\\apix\\apix-uaui-protocol\\axon-puls-platform\\scripts\\comprehensive-testing-suite.js:877:13)",
+          "timestamp": "2025-08-31T13:44:01.070Z"
+        }
+      ],
+      "passed": 2,
+      "failed": 1
+    },
+    "performance": {
+      "tests": [],
+      "passed": 0,
+      "failed": 0
+    },
+    "security": {
+      "tests": [],
+      "passed": 0,
+      "failed": 0
+    },
+    "enterprise": {
+      "tests": [],
+      "passed": 0,
+      "failed": 0
+    },
+    "scalability": {
+      "tests": [],
+      "passed": 0,
+      "failed": 0
+    },
+    "reliability": {
+      "tests": [],
+      "passed": 0,
+      "failed": 0
+    }
+  },
+  "benchmarks": {},
+  "proofDocuments": []
+}

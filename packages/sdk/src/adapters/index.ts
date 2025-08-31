@@ -5,6 +5,7 @@
  */
 
 import type { AxonPulsClient } from '../core/client';
+import { isReactEnvironment, isVueEnvironment, isAngularEnvironment } from '../utils/framework-detection';
 
 export interface FrameworkAdapter {
     name: string;
@@ -13,32 +14,52 @@ export interface FrameworkAdapter {
     createBinding(client: AxonPulsClient): any;
 }
 
-// Framework detection utilities
+// Re-export consolidated framework detection utilities
+export {
+    detectReact as detectReactFramework,
+    detectVue as detectVueFramework,
+    detectAngular as detectAngularFramework,
+    detectSvelte as detectSvelteFramework,
+    detectAllFrameworks,
+    isReactEnvironment,
+    isVueEnvironment,
+    isAngularEnvironment,
+    isSvelteEnvironment,
+    getPrimaryFramework,
+    clearDetectionCache,
+    getDetectionCacheStats
+} from '../utils/framework-detection';
+
+// Simplified framework detector using functional API
+// Note: FrameworkDetector temporarily disabled due to missing universal-adapter
+// export { FrameworkDetector } from '../framework/universal-adapter';
+
+// Backward compatibility functions
 export function detectReact(): boolean {
-    if (typeof window === 'undefined') return false;
-    return !!(window as any).React ||
-        !!(globalThis as any).React ||
-        typeof require !== 'undefined' && (() => {
-            try { require('react'); return true; } catch { return false; }
-        })();
+    return isReactEnvironment();
 }
 
 export function detectVue(): boolean {
-    if (typeof window === 'undefined') return false;
-    return !!(window as any).Vue ||
-        !!(globalThis as any).Vue ||
-        typeof require !== 'undefined' && (() => {
-            try { require('vue'); return true; } catch { return false; }
-        })();
+    return isVueEnvironment();
 }
 
 export function detectAngular(): boolean {
-    if (typeof window === 'undefined') return false;
-    return !!(window as any).ng ||
-        !!(globalThis as any).ng ||
-        typeof require !== 'undefined' && (() => {
-            try { require('@angular/core'); return true; } catch { return false; }
-        })();
+    return isAngularEnvironment();
+}
+
+export function detectSvelte(): boolean {
+    return isSvelteEnvironment();
+}
+
+// Fix for missing isSvelteEnvironment - add fallback
+function isSvelteEnvironment(): boolean {
+    if (typeof window !== 'undefined') {
+        // Check for Svelte-specific globals
+        return !!(window as any).__svelte ||
+            !!(window as any).svelte ||
+            document.querySelector('[data-svelte]') !== null;
+    }
+    return false;
 }
 
 export function detectFramework(): { framework: string; version?: string } | null {

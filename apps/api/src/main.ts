@@ -24,7 +24,7 @@ async function bootstrap() {
   const environment = configService.get<string>('NODE_ENV', 'development');
 
   // Security middleware
-  await app.register(helmet, {
+  await app.register(helmet as any, {
     contentSecurityPolicy: {
       directives: {
         defaultSrc: [`'self'`],
@@ -37,13 +37,13 @@ async function bootstrap() {
   });
 
   // CORS configuration
-  await app.register(cors, {
+  await app.register(cors as any, {
     origin: configService.get<string>('CORS_ORIGIN', 'http://localhost:3000'),
     credentials: true,
   });
 
   // Rate limiting
-  await app.register(rateLimit, {
+  await app.register(rateLimit as any, {
     max: configService.get<number>('RATE_LIMIT_MAX', 100),
     timeWindow: configService.get<number>('RATE_LIMIT_WINDOW', 60000), // 1 minute
   });

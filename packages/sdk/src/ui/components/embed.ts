@@ -14,6 +14,7 @@ import { AxonChat, type ChatConfig } from './chat';
 import { AxonPresence, type PresenceConfig } from './presence';
 import { AxonHITL, type HITLConfig } from './hitl';
 import type { AxonPulsClient } from '../../core/client';
+import { getEmbedConfig } from '../../config/ui-config';
 
 export interface EmbedConfig extends ComponentConfig {
     el: string | HTMLElement;
@@ -35,10 +36,11 @@ export class AxonEmbed extends AxonUIComponent {
 
     constructor(config: EmbedConfig) {
         super(config);
+        const embedDefaults = getEmbedConfig();
         this.config = {
-            features: ['chat'],
-            width: '400px',
-            height: '500px',
+            features: embedDefaults.defaultFeatures,
+            width: embedDefaults.defaultWidth,
+            height: embedDefaults.defaultHeight,
             theme: 'light',
             ...config
         };

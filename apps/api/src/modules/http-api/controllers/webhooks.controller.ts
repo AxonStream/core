@@ -29,6 +29,7 @@ import { CurrentTenant } from '../../../common/decorators/current-tenant.decorat
 import { TenantContext } from '../../../common/services/tenant-aware.service';
 import { DeliveryGuaranteeService } from '../../../common/services/delivery-guarantee.service';
 import { CreateWebhookDto, UpdateWebhookDto } from '../dto/webhooks.dto';
+import { WebhookTemplatesService } from '../../../common/services/webhook-templates.service';
 
 @ApiTags('webhooks')
 @Controller('webhooks')
@@ -39,6 +40,7 @@ export class WebhooksController {
 
     constructor(
         private readonly deliveryGuaranteeService: DeliveryGuaranteeService,
+        private readonly webhookTemplatesService: WebhookTemplatesService,
     ) { }
 
     @Post()
@@ -376,6 +378,177 @@ export class WebhooksController {
             };
         } catch (error) {
             this.logger.error(`Failed to get webhook deliveries: ${error.message}`);
+            throw error;
+        }
+    }
+
+    // ============================================================================
+    // WEBHOOK TEMPLATES - ADVANCED FEATURES
+    // ============================================================================
+
+    @Get('templates')
+    @ApiOperation({
+        summary: 'Get webhook templates',
+        description: 'Get all available prebuilt webhook templates for common integrations.',
+    })
+    @ApiResponse({
+        status: 200,
+        description: 'List of webhook templates',
+        schema: {
+            type: 'object',
+            properties: {
+                success: { type: 'boolean' },
+                templates: {
+                    type: 'array',
+                    items: {
+                        type: 'object',
+                        properties: {
+                            id: { type: 'string' },
+                            name: { type: 'string' },
+                            description: { type: 'string' },
+                            category: { type: 'string' },
+                            variables: { type: 'object' },
+                            examples: { type: 'array' },
+                        },
+                    },
+                },
+            },
+        },
+    })
+    async getWebhookTemplates() {
+        try {
+            const templates = this.webhookTemplatesService.getTemplates();
+
+            return {
+                success: true,
+                templates: templates.map(template => ({
+                    id: template.id,
+                    name: template.name,
+                    description: template.description,
+                    category: template.category,
+                    variables: template.variables,
+                    examples: template.examples,
+                })),
+                timestamp: new Date().toISOString(),
+            };
+        } catch (error) {
+            this.logger.error(`Failed to get webhook templates: ${error.message}`);
+            throw error;
+        }
+    }
+
+    @Get('templates/:templateId')
+    @ApiOperation({
+        summary: 'Get webhook template details',
+        description: 'Get detailed configuration for a specific webhook template.',
+    })
+    @ApiParam({
+        name: 'templateId',
+        description: 'Template ID',
+        example: 'slack-notifications',
+    })
+    @ApiResponse({
+        status: 200,
+        description: 'Webhook template details',
+    })
+    @ApiResponse({
+        status: 404,
+        description: 'Template not found',
+    })
+    async getWebhookTemplate(@Param('templateId') templateId: string) {
+        try {
+            const template = this.webhookTemplatesService.getTemplate(templateId);
+
+            if (!template) {
+                throw new NotFoundException(`Webhook template not found: ${templateId}`);
+            }
+
+            return {
+                success: true,
+                template,
+                timestamp: new Date().toISOString(),
+            };
+        } catch (error) {
+            this.logger.error(`Failed to get webhook template: ${error.message}`);
+            throw error;
+        }
+    }
+
+    @Post('from-template/:templateId')
+    @ApiOperation({
+        summary: 'Create webhook from template',
+        description: 'Create a new webhook endpoint using a prebuilt template.',
+    })
+    @ApiParam({
+        name: 'templateId',
+        description: 'Template ID to use',
+        example: 'slack-notifications',
+    })
+    @ApiBody({
+        schema: {
+            type: 'object',
+            properties: {
+                variables: {
+                    type: 'object',
+                    description: 'Template variables',
+                    example: {
+                        SLACK_BOT_TOKEN: 'xoxb-your-token',
+                        SLACK_CHANNEL: '#general',
+                    },
+                },
+                customConfig: {
+                    type: 'object',
+                    description: 'Additional webhook configuration',
+                },
+            },
+            required: ['variables'],
+        },
+    })
+    @ApiResponse({
+        status: 201,
+        description: 'Webhook created from template',
+    })
+    @ApiResponse({
+        status: 400,
+        description: 'Invalid template or missing variables',
+    })
+    async createWebhookFromTemplate(
+        @CurrentTenant() context: TenantContext,
+        @Param('templateId') templateId: string,
+        @Body() body: { variables: Record<string, string>; customConfig?: any },
+    ) {
+        try {
+            this.logger.debug(`Creating webhook from template: ${templateId}`);
+
+            // Create webhook configuration from template
+            const webhookConfig = this.webhookTemplatesService.createFromTemplate(
+                templateId,
+                body.variables,
+                body.customConfig
+            );
+
+            if (!webhookConfig) {
+                throw new BadRequestException(`Failed to create webhook from template: ${templateId}`);
+            }
+
+            // Register webhook using existing service
+            const webhookId = await this.deliveryGuaranteeService.registerDeliveryEndpoint(
+                context,
+                webhookConfig,
+            );
+
+            this.logger.log(`Webhook created from template ${templateId}: ${webhookId}`);
+
+            return {
+                success: true,
+                webhookId,
+                templateId,
+                url: webhookConfig.url,
+                active: webhookConfig.active,
+                timestamp: new Date().toISOString(),
+            };
+        } catch (error) {
+            this.logger.error(`Failed to create webhook from template: ${error.message}`);
             throw error;
         }
     }

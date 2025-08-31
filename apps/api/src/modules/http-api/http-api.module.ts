@@ -6,6 +6,7 @@ import { WebhooksController } from './controllers/webhooks.controller';
 import { EventStreamService } from '../../common/services/event-stream.service';
 import { EventReplayService } from '../../common/services/event-replay.service';
 import { DeliveryGuaranteeService } from '../../common/services/delivery-guarantee.service';
+import { WebhookTemplatesService } from '../../common/services/webhook-templates.service';
 import { TenantAwareService } from '../../common/services/tenant-aware.service';
 import { RedisService } from '../../common/services/redis.service';
 import { PrismaService } from '../../common/services/prisma.service';
@@ -29,6 +30,7 @@ import { AuthModule } from '../auth/auth.module';
         EventStreamService,
         EventReplayService,
         DeliveryGuaranteeService,
+        WebhookTemplatesService,
         TenantAwareService,
         RedisService,
         PrismaService,

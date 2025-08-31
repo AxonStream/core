@@ -11,6 +11,7 @@ import { databaseConfig } from './config/database.config';
 import { redisConfig } from './config/redis.config';
 import { authConfig } from './config/auth.config';
 import { websocketConfig } from './config/websocket.config';
+import { tenantConfig } from './config/tenant.config';
 
 // Import common modules
 import { RedisModule } from './common/redis.module';
@@ -30,13 +31,14 @@ import { AuditLoggerModule } from './modules/audit-logger/audit-logger.module';
 import { RBACModule } from './modules/rbac/rbac.module';
 import { HttpApiModule } from './modules/http-api/http-api.module';
 import { MagicModule } from './modules/magic/magic.module';
+import { DemoModule } from './modules/demo/demo.module';
 
 @Module({
   imports: [
     // Configuration
     ConfigModule.forRoot({
       isGlobal: true,
-      load: [databaseConfig, redisConfig, authConfig, websocketConfig],
+      load: [databaseConfig, redisConfig, authConfig, websocketConfig, tenantConfig],
       envFilePath: ['.env.local', '.env'],
     }),
 
@@ -77,6 +79,7 @@ import { MagicModule } from './modules/magic/magic.module';
     RBACModule,
     HttpApiModule,
     MagicModule,
+    DemoModule,
   ],
   controllers: [AppController, SseController],
   providers: [AppService],

@@ -23,4 +23,36 @@ export class AppController {
   getStatus() {
     return this.appService.getStatus();
   }
+
+  @Public()
+  @Get('health')
+  @ApiOperation({ summary: 'Kubernetes health check endpoint' })
+  @ApiResponse({ status: 200, description: 'Service is healthy' })
+  getHealthCheck() {
+    return this.appService.getHealth();
+  }
+
+  @Public()
+  @Get('ready')
+  @ApiOperation({ summary: 'Kubernetes readiness probe' })
+  @ApiResponse({ status: 200, description: 'Service is ready' })
+  getReadiness() {
+    return this.appService.getReadiness();
+  }
+
+  @Public()
+  @Get('live')
+  @ApiOperation({ summary: 'Kubernetes liveness probe' })
+  @ApiResponse({ status: 200, description: 'Service is live' })
+  getLiveness() {
+    return this.appService.getLiveness();
+  }
+
+  @Public()
+  @Get('metrics')
+  @ApiOperation({ summary: 'Prometheus metrics endpoint' })
+  @ApiResponse({ status: 200, description: 'Prometheus metrics' })
+  getMetrics() {
+    return this.appService.getMetrics();
+  }
 }

@@ -11,6 +11,12 @@
 
 import type { AxonPulsClient, AxonPulsEvent } from '../core/client';
 import type { FrameworkAdapter } from './index';
+import { isAngularEnvironment } from '../utils/framework-detection';
+
+// Angular types (will be available when Angular is present)
+declare const ViewChild: any;
+declare const Input: any;
+type ElementRef = any;
 
 // Angular binding interface
 export interface AngularBinding {
@@ -458,12 +464,84 @@ export function createAngularBinding(client: AxonPulsClient): AngularBinding {
             AxonPresenceComponent,
             AxonHITLComponent: Component({
                 selector: 'axon-hitl',
-                template: '<div>HITL Component</div>'
-            })(class { }),
+                template: '<div #hitlContainer></div>',
+                inputs: ['department', 'client', 'currentUser', 'autoAcceptRoles', 'showPriority']
+            })(class {
+                @ViewChild('hitlContainer', { static: true }) hitlContainer!: ElementRef;
+                @Input() department: string = 'general';
+                @Input() client: any;
+                @Input() currentUser: any;
+                @Input() autoAcceptRoles: string[] = [];
+                @Input() showPriority: boolean = true;
+
+                private hitlInstance: any = null;
+
+                async ngAfterViewInit() {
+                    try {
+                        const { AxonHITL } = await import('../ui/components/hitl');
+                        this.hitlInstance = new AxonHITL({
+                            department: this.department,
+                            client: this.client,
+                            currentUser: this.currentUser,
+                            autoAcceptRoles: this.autoAcceptRoles,
+                            showPriority: this.showPriority,
+                            theme: 'auto'
+                        });
+                        this.hitlInstance.mount(this.hitlContainer.nativeElement);
+                    } catch (error) {
+                        console.error('Failed to load HITL component:', error);
+                        this.hitlContainer.nativeElement.innerHTML = '<div style="padding: 20px; color: #e74c3c;">Failed to load HITL component</div>';
+                    }
+                }
+
+                ngOnDestroy() {
+                    if (this.hitlInstance) {
+                        this.hitlInstance.unmount();
+                        this.hitlInstance = null;
+                    }
+                }
+            }),
             AxonEmbedComponent: Component({
                 selector: 'axon-embed',
-                template: '<div>Embed Component</div>'
-            })(class { })
+                template: '<div #embedContainer></div>',
+                inputs: ['token', 'channel', 'org', 'features', 'width', 'height']
+            })(class {
+                @ViewChild('embedContainer', { static: true }) embedContainer!: ElementRef;
+                @Input() token: string = '';
+                @Input() channel: string = '';
+                @Input() org: string = '';
+                @Input() features: ('chat' | 'presence' | 'hitl' | 'notifications')[] = ['chat'];
+                @Input() width: string = '400px';
+                @Input() height: string = '500px';
+
+                private embedInstance: any = null;
+
+                async ngAfterViewInit() {
+                    try {
+                        const { AxonEmbed } = await import('../ui/components/embed');
+                        this.embedInstance = new AxonEmbed({
+                            el: this.embedContainer.nativeElement,
+                            token: this.token,
+                            channel: this.channel,
+                            org: this.org,
+                            features: this.features,
+                            width: this.width,
+                            height: this.height,
+                            theme: 'auto'
+                        });
+                    } catch (error) {
+                        console.error('Failed to load Embed component:', error);
+                        this.embedContainer.nativeElement.innerHTML = '<div style="padding: 20px; color: #e74c3c;">Failed to load Embed component</div>';
+                    }
+                }
+
+                ngOnDestroy() {
+                    if (this.embedInstance) {
+                        this.embedInstance.unmount();
+                        this.embedInstance = null;
+                    }
+                }
+            })
         },
         module: AxonStreamModule
     };
@@ -474,12 +552,7 @@ export const AngularAdapter: FrameworkAdapter = {
     name: 'angular',
     version: '1.0.0',
     detectFramework() {
-        try {
-            return !!(typeof window !== 'undefined' && (window as any).ng) ||
-                !!(typeof require !== 'undefined' && require('@angular/core'));
-        } catch {
-            return false;
-        }
+        return isAngularEnvironment();
     },
     createBinding(client: AxonPulsClient) {
         return createAngularBinding(client);

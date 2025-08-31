@@ -1,411 +1,426 @@
-# @axonstream/core
+# 🚀 AXONSTREAM CORE SDK
 
-🚀 **ONE PACKAGE FOR EVERYTHING** 
+**The most advanced real-time collaboration platform with Magic collaboration, self-healing infrastructure, and universal framework support.**
 
-The complete AxonStream real-time platform in a single package. Built by [AxonStream AI](https://axonstream.ai).
+[![npm version](https://badge.fury.io/js/%40axonstream%2Fcore.svg)](https://badge.fury.io/js/%40axonstream%2Fcore)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.3-blue.svg)](https://www.typescriptlang.org/)
 
-## 🎯 **ONE COMMAND ALL DONE**
+## ✨ Game-Changing Features
+
+### 🎯 Magic Collaboration
+- **Operational Transform (OT)** - Real-time conflict resolution
+- **Time Travel & Branching** - Git-like versioning for collaborative documents
+- **Presence Awareness** - See who's online, cursor positions, selections
+- **Auto-snapshots** - Never lose work with intelligent state preservation
+
+### 🔧 Self-Healing Infrastructure
+- **Auto-reconnect** - Intelligent reconnection with exponential backoff
+- **Circuit Breakers** - Prevent cascade failures
+- **Retry Management** - Configurable retry strategies
+- **Health Monitoring** - Real-time system health tracking
+
+### 🌐 Universal Framework Support
+- **Auto-Detection** - Automatically detects React, Vue, Angular, Svelte
+- **Framework Bindings** - Native hooks, components, and utilities for each framework
+- **Vanilla Fallback** - Works anywhere, even without a framework
+- **Lazy Loading** - Load only what you need
+
+### 🏢 Enterprise-Grade Features
+- **Multi-Tenant RBAC** - Role-based access control
+- **Real-Time Event Streaming** - Redis streams with consumer groups
+- **Production Monitoring** - Latency tracking, metrics, alerts
+- **Webhook Templates** - Pre-built integrations for 5000+ apps
+
+## 🚀 Quick Start
+
+### Installation
 
 ```bash
 npm install @axonstream/core
+# or
+yarn add @axonstream/core
+# or
+pnpm add @axonstream/core
 ```
 
-## 🔭 **FOUR WAYS TO USE AXONSTREAM**
-
-### 1. **NPM (apps):** One import provides everything
+### Basic Usage
 
 ```typescript
-import { createAxonStream } from '@axonstream/core';
+import { AxonStreamClient, createUniversalAdapter } from '@axonstream/core';
 
-// ONE COMMAND - ALL DONE
-const axon = await createAxonStream({
-  org: 'your-org',
-  token: 'your-jwt-token'
-});
-
-// Everything is ready
-await axon.connect();
-```
-
-### 2. **CDN (websites, no build):** Global AxonSDK + AXONUI
-
-```html
-<script src="https://cdn.axonstream.ai/axonui.min.js"></script>
-<script>
-  // Everything is globally available
-  const axon = new window.AxonSDK({ 
-    url: 'wss://your-org.axonstream.ai',
-    token: 'your-jwt-token'
-  });
-  await axon.connect();
-</script>
-```
-
-### 3. **HTTP API (servers/no SDK):** Call endpoints directly
-
-```bash
-curl -X POST "https://api.axonstream.ai/v1/events" \
-  -H "Authorization: Bearer jwt-token" \
-  -d '{"channel": "test", "data": {"hello": "world"}}'
-```
-
-### 4. **Single embed:** AXONUI.mount() - that's it!
-
-```html
-<div id="axon-app"></div>
-<script src="https://cdn.axonstream.ai/axonui.min.js"></script>
-<script>
-  AXONUI.mount({
-    el: '#axon-app',
-    token: 'your-jwt-token',
-    channel: 'chat-room',
-    org: 'your-org'
-  });
-</script>
-```
-
-## 📦 **What's Included**
-
-- ✅ **Core SDK** - Connect, subscribe, publish, replay
-- ✅ **Multi-Tenant** - Org isolation, RBAC, JWT RS256
-- ✅ **Self-Healing** - Auto-reconnect, retry, circuit breaker
-- ✅ **Embed Helper** - One-line embed anywhere  
-- ✅ **CDN Build** - Global window access
-- ✅ **TypeScript** - Full type safety
-- ✅ **React Hooks** - Auto-detected and lazy-loaded
-- ✅ **Vue Composables** - Auto-detected and lazy-loaded  
-- ✅ **Angular Services** - Auto-detected and lazy-loaded
-- ✅ **UI Components** - Complete AXONUI component system
-- ✅ **Framework Adapters** - Zero-config framework detection
-
-## 🎨 **Quick Start Examples**
-
-### Real-time Chat
-
-```typescript
-import { AxonPulsClient } from '@axonstream/core';
-
-const client = new AxonPulsClient({
+// Create client
+const client = new AxonStreamClient({
   url: 'wss://your-org.axonstream.ai',
   token: 'your-jwt-token'
 });
 
-await client.connect();
-await client.subscribe(['org:your-org:chat:general']);
+// Create universal adapter (auto-detects framework)
+const axon = createUniversalAdapter(client);
 
-client.on('event', (event) => {
-  console.log('New message:', event.payload);
+// Connect and subscribe
+await axon.connect();
+await axon.subscribe(['notifications', 'updates']);
+
+// Listen for events
+axon.on('event', (event) => {
+  console.log('Received event:', event);
 });
 
-// Send a message
-await client.publish('org:your-org:chat:general', {
-  type: 'chat_message',
-  payload: { text: 'Hello AXONPULS!', user: 'John' }
+// Publish events
+await axon.publish('notifications', 'user_joined', {
+  userId: '123',
+  userName: 'John Doe'
 });
 ```
 
-### Simple Embed
+## 🎯 Magic Collaboration
 
-```html
-<!DOCTYPE html>
-<html>
-<head>
-  <title>AXONPULS Live Demo</title>
-</head>
-<body>
-  <h1>My App with Real-time Features</h1>
-  <div id="live-chat"></div>
+### Create Collaborative Rooms
+
+```typescript
+// Create a Magic room
+const room = await axon.magic.createRoom('document-editor', {
+  content: '',
+  cursor: 0
+}, {
+  timeTravel: true,
+  presence: true,
+  conflictResolution: 'operational_transform'
+});
+
+// Join the room
+await axon.magic.joinRoom('document-editor', {
+  userName: 'John Doe',
+  userAvatar: 'https://example.com/avatar.jpg'
+});
+
+// Subscribe to real-time updates
+await axon.magic.subscribeToRoom('document-editor');
+```
+
+### Real-Time Collaboration
+
+```typescript
+// Apply operations (automatically resolved with OT)
+const result = await axon.magic.applyOperation('document-editor', {
+  type: 'magic_set',
+  path: ['content'],
+  value: 'Hello, World!'
+});
+
+// Listen for remote operations
+axon.on('magic_operation_received', (data) => {
+  console.log('Remote operation:', data.operation);
+  // Update your UI accordingly
+});
+```
+
+### Time Travel & Branching
+
+```typescript
+// Create snapshots
+const snapshot = await axon.timeTravel.createSnapshot(
+  room.id,
+  'Major milestone reached'
+);
+
+// Create branches
+const featureBranch = await axon.timeTravel.createBranch(
+  room.id,
+  snapshot.id,
+  'feature/new-editor'
+);
+
+// Merge branches
+const mergeResult = await axon.timeTravel.mergeBranches(
+  room.id,
+  'feature/new-editor',
+  'main'
+);
+```
+
+### Presence Awareness
+
+```typescript
+// Update cursor position
+await axon.presence.updateCursor('document-editor', 150, 200);
+
+// Update text selection
+await axon.presence.updateSelection('document-editor', 100, 150);
+
+// Listen for presence updates
+axon.on('presence_updated', (data) => {
+  console.log(`${data.userName} moved cursor to`, data.cursorPosition);
+});
+```
+
+## 🌐 Framework Auto-Detection
+
+### React
+
+```typescript
+import { useAxonStream, useMagicCollaboration } from '@axonstream/core/react';
+
+function MyComponent() {
+  const { client, isConnected } = useAxonStream();
+  const { createRoom, joinRoom } = useMagicCollaboration();
   
-  <script src="https://cdn.axonstream.ai/axonui.min.js"></script>
-  <script>
-    AXONUI.mount({
-      el: '#live-chat',
-      token: 'your-jwt-token',
-      channel: 'org:your-org:support',
-      theme: 'dark'
-    });
-  </script>
-</body>
-</html>
-```
-
-## 🛡️ **Security & Multi-Tenancy**
-
-- RS256 JWT with org_id isolation
-- Channel prefix enforcement (`org:your-org:*`)
-- Role-based access control
-- Rate limiting per organization
-- CSRF/CORS protection
-
-## 🔧 **Development**
-
-```bash
-# Build everything
-npm run build
-
-# Individual builds
-npm run build:sdk     # Core SDK
-npm run build:cdn     # Global window build  
-npm run build:embed   # Embed helper
-
-# Development
-npm run dev           # Watch mode
-```
-
-## 📊 **Size Budgets**
-
-- **Core SDK:** ~45 KB (min+gz) - Full featured client
-- **CDN/IIFE:** ~75 KB (min+gz) - Includes embed UI
-- **Embed only:** ~25 KB (min+gz) - Basic chat interface
-
-## 🎯 **Framework Integration Examples**
-
-### React with Hooks
-
-```tsx
-import { createAxonStream } from '@axonstream/core';
-import { useEffect, useState } from 'react';
-
-function App() {
-  const [axon, setAxon] = useState(null);
-
-  useEffect(() => {
-    const initAxon = async () => {
-      const client = await createAxonStream({
-        org: 'my-org',
-        token: 'jwt-token'
-      });
-      
-      await client.connect();
-      setAxon(client);
-    };
-    
-    initAxon();
-  }, []);
-
-  if (!axon) return <div>Connecting...</div>;
-
+  // Use React hooks naturally
   return (
     <div>
-      <h1>Real-time App</h1>
-      {/* Framework adapter auto-detects React and provides hooks */}
-      <ChatComponent axon={axon} />
+      Status: {isConnected ? 'Connected' : 'Disconnected'}
     </div>
   );
 }
-
-function ChatComponent({ axon }) {
-  // Framework adapter provides React hooks automatically
-  const { ui } = axon;
-  
-  useEffect(() => {
-    // Render chat component
-    ui.render('#chat-container', 'chat', {
-      channel: 'general',
-      theme: 'dark'
-    });
-  }, []);
-
-  return <div id="chat-container" />;
-}
 ```
 
-### Vue with Composables
-
-```vue
-<template>
-  <div>
-    <h1>Real-time App</h1>
-    <div ref="chatContainer" />
-  </div>
-</template>
-
-<script setup>
-import { ref, onMounted } from 'vue';
-import { createAxonStream } from '@axonstream/core';
-
-const chatContainer = ref(null);
-
-onMounted(async () => {
-  const axon = await createAxonStream({
-    org: 'my-org', 
-    token: 'jwt-token'
-  });
-  
-  await axon.connect();
-  
-  // Framework adapter auto-detects Vue and provides composables
-  axon.ui.render(chatContainer.value, 'presence', {
-    room: 'team-room',
-    currentUser: { id: '1', name: 'John' }
-  });
-});
-</script>
-```
-
-### Angular with Services
+### Vue
 
 ```typescript
-import { Component, OnInit } from '@angular/core';
-import { createAxonStream } from '@axonstream/core';
+import { useAxonStream } from '@axonstream/core/vue';
 
-@Component({
-  selector: 'app-root',
-  template: `
-    <h1>Real-time App</h1>
-    <div #hitlContainer></div>
-  `
-})
-export class AppComponent implements OnInit {
-  async ngOnInit() {
-    const axon = await createAxonStream({
-      org: 'my-org',
-      token: 'jwt-token'  
-    });
+export default {
+  setup() {
+    const { client, isConnected } = useAxonStream();
     
-    await axon.connect();
-    
-    // Framework adapter auto-detects Angular and provides services
-    axon.ui.render('#hitlContainer', 'hitl', {
-      department: 'finance',
-      currentUser: { id: '1', name: 'Manager', role: 'approver' }
-    });
+    return {
+      isConnected
+    };
+  }
+};
+```
+
+### Angular
+
+```typescript
+import { AxonStreamService } from '@axonstream/core/angular';
+
+@Component({...})
+export class MyComponent {
+  constructor(private axonStream: AxonStreamService) {}
+  
+  async connect() {
+    await this.axonStream.connect();
   }
 }
 ```
 
-## 🚀 **AXONUI Component System**
-
-### Complete Widget Builder
+### Vanilla JavaScript
 
 ```typescript
-import { createAxonStream, AxonUIBuilder } from '@axonstream/core';
+import { createUniversalAdapter } from '@axonstream/core';
 
-const axon = await createAxonStream({ org: 'my-org', token: 'jwt-token' });
+const axon = createUniversalAdapter(client);
+
+// Works the same way in any environment
 await axon.connect();
-
-// Build a complete real-time dashboard
-const ui = axon.ui.builder()
-  .chat({ channel: 'support', theme: 'dark' })
-  .presence({ room: 'office', currentUser: { id: '1', name: 'John' } })
-  .hitl({ department: 'finance', showPriority: true })
-  .notifications({ position: 'top-right', enableSound: true })
-  .mount('#dashboard');
-
-// Individual components
-const chat = ui.chat;
-const presence = ui.presence;
-const hitl = ui.hitl;
+await axon.subscribe(['channel']);
 ```
 
-### CDN Usage with Full Features
+## 🔧 Advanced Configuration
 
-```html
-<!DOCTYPE html>
-<html>
-<head>
-  <title>AXONPULS Dashboard</title>
-  <script src="https://cdn.axonstream.ai/axonui.min.js"></script>
-</head>
-<body>
-  <h1>Real-time Dashboard</h1>
-  <div id="dashboard"></div>
+### Custom Configuration
+
+```typescript
+import { createUniversalAdapter, createProductionConfig } from '@axonstream/core';
+
+const config = createProductionConfig();
+config.magic.autoSnapshot = true;
+config.magic.snapshotInterval = 2 * 60 * 1000; // 2 minutes
+
+const axon = createUniversalAdapter(client, {
+  enableMagic: true,
+  enablePresence: true,
+  enableTimeTravel: true,
+  debug: false
+});
+```
+
+### Environment-Specific Configs
+
+```typescript
+import { 
+  createDevelopmentConfig, 
+  createStagingConfig, 
+  createProductionConfig 
+} from '@axonstream/core';
+
+const config = process.env.NODE_ENV === 'production' 
+  ? createProductionConfig()
+  : createDevelopmentConfig();
+```
+
+## 📊 Monitoring & Analytics
+
+### Performance Metrics
+
+```typescript
+// Get connection metrics
+const metrics = axon.getConnectionMetrics();
+console.log('Latency:', metrics.connectionLatency);
+console.log('Reconnect count:', metrics.reconnectCount);
+
+// Health check
+const health = await axon.getHealthStatus();
+console.log('Status:', health.status);
+console.log('Message:', health.message);
+```
+
+### Real-Time Monitoring
+
+```typescript
+// Listen for performance events
+axon.on('performance_alert', (alert) => {
+  console.log('Performance issue:', alert.message);
+  console.log('Severity:', alert.severity);
+});
+
+// Custom metrics
+axon.trackCustomMetric('user_action', {
+  action: 'button_click',
+  duration: 150,
+  userId: '123'
+});
+```
+
+## 🔌 Webhooks & Integrations
+
+### Pre-built Templates
+
+```typescript
+import { WebhookTemplates } from '@axonstream/core';
+
+// Use Slack template
+const slackWebhook = WebhookTemplates.createFromTemplate('slack-notifications', {
+  SLACK_BOT_TOKEN: 'xoxb-your-token',
+  SLACK_CHANNEL: '#alerts'
+});
+
+// Use Discord template
+const discordWebhook = WebhookTemplates.createFromTemplate('discord-webhooks', {
+  DISCORD_WEBHOOK_URL: 'https://discord.com/api/webhooks/...'
+});
+```
+
+### Custom Webhooks
+
+```typescript
+const webhook = await axon.webhooks.create({
+  name: 'My App Webhook',
+  url: 'https://myapp.com/webhooks/axonstream',
+  method: 'POST',
+  headers: {
+    'Authorization': 'Bearer my-api-key'
+  },
+  retryPolicy: {
+    maxRetries: 5,
+    backoffStrategy: 'exponential'
+  }
+});
+```
+
+## 🚀 Production Deployment
+
+### Environment Variables
+
+```bash
+# Required
+AXONSTREAM_URL=wss://your-org.axonstream.ai
+AXONSTREAM_TOKEN=your-jwt-token
+
+# Optional
+AXONSTREAM_DEBUG=false
+AXONSTREAM_ENABLE_MAGIC=true
+AXONSTREAM_ENABLE_PRESENCE=true
+AXONSTREAM_ENABLE_TIME_TRAVEL=true
+```
+
+### Health Checks
+
+```typescript
+// Implement health check endpoint
+app.get('/health', async (req, res) => {
+  const health = await axon.getHealthStatus();
   
-  <script>
-    // Everything available globally
-    const client = new window.AxonSDK({
-      url: 'wss://my-org.axonstream.ai',
-      token: 'jwt-token'
-    });
-    
-    client.connect().then(() => {
-      // Build complete UI
-      const ui = window.AXONUI.builder(client)
-        .chat({ channel: 'general' })
-        .presence({ room: 'team' })
-        .hitl({ department: 'support' })
-        .mount('#dashboard');
-        
-      // Or individual components
-      window.AXONUI.createChat({
-        client,
-        channel: 'support',
-        theme: 'dark'
-      }).mount('#chat');
-    });
-  </script>
-</body>
-</html>
+  if (health.status === 'healthy') {
+    res.status(200).json(health);
+  } else {
+    res.status(503).json(health);
+  }
+});
 ```
 
-### Framework Auto-Detection
-
-```javascript
-// Automatically detects your framework and provides appropriate bindings
-import { detectFramework, createFrameworkBinding } from '@axonstream/core';
-
-const framework = detectFramework();
-console.log(framework); // { framework: 'react', version: '18.2.0' }
-
-const client = new AxonPulsClient({ url: 'ws://localhost:3001', token: 'jwt' });
-const binding = await createFrameworkBinding(client);
-
-// `binding` now contains framework-specific hooks/composables/services
-```
-
-## 📝 **API Reference**
+## 📚 API Reference
 
 ### Core Client
 
-```typescript
-import { AxonPulsClient } from '@axonstream/core';
+- `AxonStreamClient` - Main client class
+- `createUniversalAdapter()` - Framework-agnostic adapter factory
+- `FrameworkDetector` - Auto-detection system
 
-const client = new AxonPulsClient({
-  url: string;           // WebSocket URL
-  token: string;         // JWT token
-  autoReconnect?: boolean;  // Default: true
-  debug?: boolean;       // Default: false
-});
+### Magic Collaboration
 
-// Methods
-await client.connect();
-await client.disconnect();
-await client.subscribe(channels: string[]);
-await client.unsubscribe(channels: string[]);
-await client.publish(channel: string, event: object);
+- `MagicCollaboration` - Main collaboration class
+- `MagicTimeTravel` - Time travel and branching
+- `MagicPresence` - Real-time presence awareness
 
-// Events
-client.on('connected', () => {});
-client.on('disconnected', () => {});
-client.on('event', (event) => {});
-client.on('error', (error) => {});
-```
+### Framework Adapters
 
-### Embed Helper
+- `@axonstream/core/react` - React hooks and components
+- `@axonstream/core/vue` - Vue composables
+- `@axonstream/core/angular` - Angular services
+- `@axonstream/core/svelte` - Svelte stores
 
-```typescript
-import { mountAxonUI } from '@axonstream/core';
+### Utilities
 
-const instance = await mountAxonUI({
-  el: string | HTMLElement;     // Target element
-  token: string;                // JWT token  
-  channel: string;              // Channel to subscribe
-  org?: string;                 // Organization (optional)
-  theme?: 'light' | 'dark' | 'auto'; // UI theme
-});
+- `createEventId()` - Generate unique event IDs
+- `validateEvent()` - Validate event objects
+- `sanitizePayload()` - Remove sensitive data
+- `deepClone()` - Deep clone objects
 
-// Methods
-instance.disconnect();
-instance.send(data);
-instance.on(event, handler);
-```
+## 🔒 Security
 
-## 🆘 **Support**
+- **JWT Authentication** - Secure token-based auth
+- **Multi-Tenant Isolation** - Complete data separation
+- **RBAC** - Role-based access control
+- **Request Signing** - Optional request verification
+- **Rate Limiting** - Built-in protection
 
-- 📧 **Email:** info@axonstream.ai
-- 🌐 **Website:** https://axonstream.ai
-- 📚 **Docs:** https://docs.axonstream.ai
+## 📈 Performance
+
+- **WebSocket Optimization** - Efficient real-time communication
+- **Redis Streams** - High-performance event streaming
+- **Lazy Loading** - Load only what you need
+- **Connection Pooling** - Optimized connection management
+- **Memory Management** - Automatic cleanup and optimization
+
+## 🌟 Why Choose AxonStream?
+
+1. **🚀 Game-Changing Features** - Magic collaboration, time travel, presence
+2. **🔧 Self-Healing** - Built-in resilience and auto-recovery
+3. **🌐 Universal** - Works with any framework or no framework
+4. **🏢 Enterprise-Ready** - Multi-tenant, RBAC, monitoring
+5. **⚡ Production-Grade** - Built for scale and reliability
+6. **🎯 Developer Experience** - Intuitive API, great docs, examples
+
+## 🤝 Contributing
+
+We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
+
+## 📄 License
+
+MIT License - see [LICENSE](LICENSE) for details.
+
+## 🆘 Support
+
+- **Documentation**: [https://docs.axonstream.ai](https://docs.axonstream.ai)
+- **Discord**: [https://discord.gg/axonstream](https://discord.gg/axonstream)
+- **Email**: support@axonstream.ai
+- **Issues**: [GitHub Issues](https://github.com/axonstream/axonpuls-platform/issues)
 
 ---
 
-**Built with ❤️ by AxonStream AI**
+**Built with ❤️ by the AxonStream team**
+
+*Transform your real-time applications with the power of Magic collaboration!*

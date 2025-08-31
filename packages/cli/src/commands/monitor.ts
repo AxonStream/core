@@ -53,6 +53,7 @@ export async function monitorCommand(options?: any) {
 
         // Display stats periodically
         let statsInterval: NodeJS.Timeout;
+        const organizationId = tokenInfo.payload?.organizationId || tokenInfo.payload?.orgId;
 
         const displayStats = () => {
             console.clear();
@@ -67,7 +68,7 @@ export async function monitorCommand(options?: any) {
             console.log(`  Events/sec: ${chalk.cyan(eventsPerSecond.toFixed(2))}`);
             console.log(`  Data Transferred: ${chalk.cyan(formatBytes(stats.dataTransferred))}`);
             console.log(`  Uptime: ${chalk.cyan(formatDuration(uptime))}`);
-            console.log(`  Organization: ${chalk.cyan(tokenInfo.payload.organizationId)}`);
+            console.log(`  Organization: ${chalk.cyan(organizationId)}`);
 
             if (stats.lastEventTime) {
                 const timeSinceLastEvent = Date.now() - stats.lastEventTime;
@@ -116,7 +117,7 @@ export async function monitorCommand(options?: any) {
                 console.log(chalk.green('✓ Real-time monitoring active'));
                 console.log(chalk.blue('ℹ Monitoring details:'));
                 console.log(`  Channels: ${chalk.cyan(channels.join(', '))}`);
-                console.log(`  Organization: ${chalk.cyan(tokenInfo.payload.organizationId)}`);
+                console.log(`  Organization: ${chalk.cyan(organizationId)}`);
 
                 if (options.since) {
                     console.log(`  Since: ${chalk.cyan(options.since)}`);

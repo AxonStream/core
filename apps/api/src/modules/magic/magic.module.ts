@@ -29,6 +29,12 @@ import { EventEmitterModule } from '@nestjs/event-emitter';
         MagicMetricsService,              // NEW - monitoring and metrics
     ],
     controllers: [MagicController],
-    exports: [MagicService],
+    exports: [
+        MagicService,
+        MagicPresenceService,
+        MagicOperationalTransformService,
+        MagicTimeTravelService,
+        MagicMetricsService,
+    ],
 })
 export class MagicModule { }

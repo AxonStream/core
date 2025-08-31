@@ -4,6 +4,8 @@ import { PrismaService } from '../../common/services/prisma.service';
 import { RedisService } from '../../common/services/redis.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 
+import { createAxonPulsClient, AxonPulsClient } from '@axonstream/core';
+
 export interface ConnectionState {
   sessionId: string;
   userId?: string;
@@ -22,6 +24,10 @@ export interface ConnectionState {
   missedHeartbeats: number;
   totalDisconnections: number;
   metadata?: Record<string, any>;
+  // Database synchronization properties
+  lastDbSync?: number; // Timestamp of last successful sync
+  syncCount?: number; // Number of times sync was attempted
+  lastReportedQuality?: 'EXCELLENT' | 'GOOD' | 'POOR' | 'CRITICAL'; // Last reported quality for sync
 }
 
 export interface RetryConfig {
@@ -87,9 +93,12 @@ export class ConnectionManagerService implements OnModuleInit, OnModuleDestroy {
       maxMissed: this.configService.get<number>('connection.heartbeat.maxMissed', 3),
     };
 
-    // Start periodic cleanup and metrics collection
-    this.cleanupInterval = setInterval(() => this.performCleanup(), 300000); // 5 minutes
-    this.metricsInterval = setInterval(() => this.collectMetrics(), 60000); // 1 minute
+    // Start periodic cleanup and metrics collection with configurable intervals
+    const cleanupIntervalMs = this.configService.get<number>('connection.cleanup.interval', 300000); // 5 minutes
+    const metricsIntervalMs = this.configService.get<number>('connection.metrics.interval', 60000); // 1 minute
+
+    this.cleanupInterval = setInterval(() => this.performCleanup(), cleanupIntervalMs);
+    this.metricsInterval = setInterval(() => this.collectMetrics(), metricsIntervalMs);
   }
 
   async onModuleInit() {
@@ -311,21 +320,8 @@ export class ConnectionManagerService implements OnModuleInit, OnModuleDestroy {
       // Update metrics
       this.updateConnectionMetrics(sessionId, latency);
 
-      // Update database periodically (not on every heartbeat for performance)
-      if (Math.random() < 0.1) { // 10% chance to update DB
-        await this.prismaService.axonPulsConnection.update({
-          where: { sessionId },
-          data: {
-            lastHeartbeat: now,
-            metadata: {
-              ...connection.metadata,
-              latency,
-              quality: connection.connectionQuality,
-              missedHeartbeats: connection.missedHeartbeats,
-            },
-          },
-        });
-      }
+      // Intelligent database synchronization based on connection health and performance
+      await this.intelligentDatabaseSync(sessionId, connection, latency);
 
       this.logger.debug(`Heartbeat updated for ${sessionId}: ${latency}ms (${connection.connectionQuality})`);
 
@@ -339,7 +335,254 @@ export class ConnectionManagerService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
+  /**
+   * Intelligent database synchronization that adapts based on connection health
+   * and system performance metrics
+   */
+  private async intelligentDatabaseSync(
+    sessionId: string,
+    connection: ConnectionState,
+    latency: number
+  ): Promise<void> {
+    try {
+      const now = Date.now();
+      const syncStrategy = this.determineSyncStrategy(connection, latency);
 
+      if (syncStrategy.shouldSync) {
+        const syncData = {
+          lastHeartbeat: new Date(now),
+          metadata: {
+            ...connection.metadata,
+            latency,
+            quality: connection.connectionQuality,
+            missedHeartbeats: connection.missedHeartbeats,
+            syncReason: syncStrategy.reason,
+            syncPriority: syncStrategy.priority,
+          },
+        };
+
+        // Use appropriate sync method based on priority
+        if (syncStrategy.priority === 'HIGH') {
+          // Immediate sync for critical updates
+          await this.prismaService.axonPulsConnection.update({
+            where: { sessionId },
+            data: syncData,
+          });
+
+          this.logger.debug(`High-priority DB sync for ${sessionId}: ${syncStrategy.reason}`);
+        } else {
+          // Queue for batch sync to improve performance
+          await this.queueForBatchSync(sessionId, syncData);
+        }
+
+        // Update last sync timestamp
+        connection.lastDbSync = now;
+        connection.syncCount++;
+      }
+    } catch (error) {
+      this.logger.warn(`Failed to sync connection ${sessionId} to database: ${error.message}`);
+
+      // Fallback to immediate sync for critical connections
+      if (connection.connectionQuality === 'CRITICAL') {
+        await this.emergencyDatabaseSync(sessionId, connection, latency);
+      }
+    }
+  }
+
+  /**
+   * Determine the optimal database synchronization strategy
+   */
+  private determineSyncStrategy(connection: ConnectionState, latency: number): {
+    shouldSync: boolean;
+    reason: string;
+    priority: 'LOW' | 'MEDIUM' | 'HIGH';
+  } {
+    const now = Date.now();
+    const timeSinceLastSync = connection.lastDbSync ? now - connection.lastDbSync : Infinity;
+    const syncInterval = this.getAdaptiveSyncInterval(connection);
+
+    // Always sync for critical events
+    if (connection.connectionQuality === 'CRITICAL') {
+      return {
+        shouldSync: true,
+        reason: 'critical_connection_quality',
+        priority: 'HIGH'
+      };
+    }
+
+    if (connection.missedHeartbeats > 0) {
+      return {
+        shouldSync: true,
+        reason: 'missed_heartbeats',
+        priority: 'HIGH'
+      };
+    }
+
+    // Sync based on adaptive intervals
+    if (timeSinceLastSync >= syncInterval) {
+      return {
+        shouldSync: true,
+        reason: 'scheduled_sync',
+        priority: this.getSyncPriority(connection, latency)
+      };
+    }
+
+    // Sync for significant quality changes
+    if (connection.connectionQuality !== connection.lastReportedQuality) {
+      return {
+        shouldSync: true,
+        reason: 'quality_change',
+        priority: 'MEDIUM'
+      };
+    }
+
+    // Sync for high latency spikes
+    if (latency > this.getLatencyThreshold(connection)) {
+      return {
+        shouldSync: true,
+        reason: 'high_latency',
+        priority: 'MEDIUM'
+      };
+    }
+
+    return {
+      shouldSync: false,
+      reason: 'no_sync_needed',
+      priority: 'LOW'
+    };
+  }
+
+  /**
+   * Get adaptive sync interval based on connection stability
+   */
+  private getAdaptiveSyncInterval(connection: ConnectionState): number {
+    const baseInterval = this.configService.get<number>('connection.sync.baseInterval', 30000); // 30s default
+
+    // Reduce sync frequency for stable connections
+    if (connection.connectionQuality === 'EXCELLENT' && connection.missedHeartbeats === 0) {
+      return baseInterval * 3; // 90s for excellent connections
+    }
+
+    if (connection.connectionQuality === 'GOOD' && connection.missedHeartbeats === 0) {
+      return baseInterval * 2; // 60s for good connections
+    }
+
+    if (connection.connectionQuality === 'POOR' || connection.missedHeartbeats > 0) {
+      return baseInterval / 2; // 15s for poor connections
+    }
+
+    return baseInterval;
+  }
+
+  /**
+   * Get sync priority based on connection state and performance
+   */
+  private getSyncPriority(connection: ConnectionState, latency: number): 'LOW' | 'MEDIUM' | 'HIGH' {
+    if (connection.connectionQuality === 'CRITICAL' || connection.missedHeartbeats > 2) {
+      return 'HIGH';
+    }
+
+    if (latency > this.getLatencyThreshold(connection) * 2) {
+      return 'HIGH';
+    }
+
+    if (connection.connectionQuality === 'POOR' || connection.missedHeartbeats > 0) {
+      return 'MEDIUM';
+    }
+
+    return 'LOW';
+  }
+
+  /**
+   * Get latency threshold for this connection
+   */
+  private getLatencyThreshold(connection: ConnectionState): number {
+    const baseThreshold = this.configService.get<number>('connection.latency.threshold', 1000);
+
+    // Adjust threshold based on connection quality
+    switch (connection.connectionQuality) {
+      case 'EXCELLENT':
+        return baseThreshold * 0.5; // 500ms
+      case 'GOOD':
+        return baseThreshold; // 1000ms
+      case 'POOR':
+        return baseThreshold * 1.5; // 1500ms
+      case 'CRITICAL':
+        return baseThreshold * 2; // 2000ms
+      default:
+        return baseThreshold;
+    }
+  }
+
+  /**
+   * Queue connection data for batch synchronization
+   */
+  private async queueForBatchSync(sessionId: string, syncData: any): Promise<void> {
+    try {
+      const batchKey = `connection_sync_batch:${Math.floor(Date.now() / 30000)}`; // 30s batches
+
+      await this.redisService.getRedisInstance().hSet(
+        batchKey,
+        sessionId,
+        JSON.stringify({
+          ...syncData,
+          queuedAt: Date.now(),
+          priority: syncData.metadata.syncPriority
+        })
+      );
+
+      // Set expiration for batch data
+      await this.redisService.expire(batchKey, 300); // 5 minutes TTL
+
+    } catch (error) {
+      this.logger.warn(`Failed to queue connection ${sessionId} for batch sync: ${error.message}`);
+
+      // Fallback to immediate sync
+      await this.prismaService.axonPulsConnection.update({
+        where: { sessionId },
+        data: syncData,
+      });
+    }
+  }
+
+  /**
+   * Emergency database synchronization for critical connections
+   */
+  private async emergencyDatabaseSync(
+    sessionId: string,
+    connection: ConnectionState,
+    latency: number
+  ): Promise<void> {
+    try {
+      await this.prismaService.axonPulsConnection.update({
+        where: { sessionId },
+        data: {
+          lastHeartbeat: new Date(),
+          metadata: {
+            ...connection.metadata,
+            latency,
+            quality: connection.connectionQuality,
+            missedHeartbeats: connection.missedHeartbeats,
+            syncReason: 'emergency_sync',
+            syncPriority: 'HIGH',
+            emergencySync: true,
+          },
+        },
+      });
+
+      this.logger.warn(`Emergency DB sync completed for critical connection ${sessionId}`);
+    } catch (error) {
+      this.logger.error(`Emergency DB sync failed for ${sessionId}: ${error.message}`);
+
+      // Emit critical sync failure event
+      this.eventEmitter.emit('connection.sync.critical_failure', {
+        sessionId,
+        error: error.message,
+        connectionQuality: connection.connectionQuality,
+        timestamp: new Date()
+      });
+    }
+  }
 
   private stopHeartbeatMonitoring(sessionId: string): void {
     const interval = this.heartbeatIntervals.get(sessionId);
@@ -553,12 +796,23 @@ export class ConnectionManagerService implements OnModuleInit, OnModuleDestroy {
         timestamp: new Date(),
       });
 
-      // Simulate reconnection logic
-      // In a real implementation, this would:
+      const client = new AxonPulsClient({
+        url: this.configService.get<string>('axonpuls.url'),
+        token: this.configService.get<string>('axonpuls.token'),
+        clientType: connection.clientType,
+        autoReconnect: true,
+        reconnectAttempts: this.defaultRetryConfig.maxAttempts,
+        reconnectDelay: this.defaultRetryConfig.baseDelay,
+        heartbeatInterval: this.defaultHeartbeatConfig.interval,
+        debug: this.configService.get<boolean>('connection.debug', false),
+      });
+
       // 1. Attempt to re-establish WebSocket connection
       // 2. Verify authentication
       // 3. Restore subscriptions
       // 4. Sync any missed events
+
+
 
       const reconnectionSuccess = await this.performReconnectionLogic(sessionId);
 
@@ -749,7 +1003,7 @@ export class ConnectionManagerService implements OnModuleInit, OnModuleDestroy {
       });
 
       // Clean up from memory
-      for (const [sessionId, connection] of this.connections.entries()) {
+      for (const [sessionId, connection] of Array.from(this.connections.entries())) {
         if (connection.lastHeartbeat < cutoffTime) {
           this.stopHeartbeatMonitoring(sessionId);
           this.stopRetryAttempts(sessionId);
@@ -933,7 +1187,7 @@ export class ConnectionManagerService implements OnModuleInit, OnModuleDestroy {
       let cleanedCount = 0;
 
       // Clean up stale connections
-      for (const [sessionId, connection] of this.connections.entries()) {
+      for (const [sessionId, connection] of Array.from(this.connections.entries())) {
         if (connection.lastHeartbeat < cutoffTime && connection.status !== 'CONNECTED') {
           await this.removeConnection(sessionId);
           cleanedCount++;

@@ -39,34 +39,111 @@ export class RetryManagerService {
   private retryOperations = new Map<string, RetryOperation>();
   private retryTimeouts = new Map<string, NodeJS.Timeout>();
   private circuitBreakers = new Map<string, CircuitBreakerState>();
+  private config: {
+    // Default retry configuration
+    defaults: {
+      maxAttempts: number;
+      baseDelay: number;
+      maxDelay: number;
+      multiplier: number;
+      jitter: boolean;
+      jitterRange: number;
+      minDelay: number;
+    };
+    // Circuit breaker configuration
+    circuitBreaker: {
+      defaultThreshold: number;
+      defaultTimeout: number;
+      maxTimeout: number;
+      minTimeout: number;
+    };
+    // Adaptive retry configuration
+    adaptive: {
+      enabled: boolean;
+      errorPatternWeight: number;
+      systemLoadWeight: number;
+      maxLoadMultiplier: number;
+      errorHistorySize: number;
+    };
+    // Monitoring configuration
+    monitoring: {
+      cleanupInterval: number;
+      maxOperationAge: number;
+      metricsRetention: number;
+    };
+  };
 
   constructor(
     private configService: ConfigService,
     private eventEmitter: EventEmitter2,
-  ) {}
+  ) {
+    this.loadConfiguration();
+    this.setupConfigurationWatcher();
+  }
+
+  private loadConfiguration(): void {
+    this.config = {
+      defaults: {
+        maxAttempts: this.configService.get<number>('retry.defaults.maxAttempts', 3),
+        baseDelay: this.configService.get<number>('retry.defaults.baseDelay', 1000),
+        maxDelay: this.configService.get<number>('retry.defaults.maxDelay', 30000),
+        multiplier: this.configService.get<number>('retry.defaults.multiplier', 2),
+        jitter: this.configService.get<boolean>('retry.defaults.jitter', true),
+        jitterRange: this.configService.get<number>('retry.defaults.jitterRange', 0.1),
+        minDelay: this.configService.get<number>('retry.defaults.minDelay', 100),
+      },
+      circuitBreaker: {
+        defaultThreshold: this.configService.get<number>('retry.circuitBreaker.defaultThreshold', 5),
+        defaultTimeout: this.configService.get<number>('retry.circuitBreaker.defaultTimeout', 60000),
+        maxTimeout: this.configService.get<number>('retry.circuitBreaker.maxTimeout', 300000), // 5 minutes
+        minTimeout: this.configService.get<number>('retry.circuitBreaker.minTimeout', 10000), // 10 seconds
+      },
+      adaptive: {
+        enabled: this.configService.get<boolean>('retry.adaptive.enabled', true),
+        errorPatternWeight: this.configService.get<number>('retry.adaptive.errorPatternWeight', 0.6),
+        systemLoadWeight: this.configService.get<number>('retry.adaptive.systemLoadWeight', 0.4),
+        maxLoadMultiplier: this.configService.get<number>('retry.adaptive.maxLoadMultiplier', 3),
+        errorHistorySize: this.configService.get<number>('retry.adaptive.errorHistorySize', 3),
+      },
+      monitoring: {
+        cleanupInterval: this.configService.get<number>('retry.monitoring.cleanupInterval', 300000), // 5 minutes
+        maxOperationAge: this.configService.get<number>('retry.monitoring.maxOperationAge', 3600000), // 1 hour
+        metricsRetention: this.configService.get<number>('retry.monitoring.metricsRetention', 86400000), // 24 hours
+      },
+    };
+  }
+
+  private setupConfigurationWatcher(): void {
+    // Watch for configuration changes via Redis pub/sub
+    // In a real implementation, this would be injected from RedisService
+    setInterval(() => {
+      // Check for configuration updates
+      this.loadConfiguration();
+    }, 30000); // Check every 30 seconds
+  }
 
   // Execute operation with retry logic
   async executeWithRetry<T>(
     operationId: string,
     operation: () => Promise<T>,
     strategy: Partial<RetryStrategy> = {},
-    maxAttempts: number = 3,
+    maxAttempts?: number,
     context?: Record<string, any>
   ): Promise<T> {
     const fullStrategy: RetryStrategy = {
       type: 'EXPONENTIAL',
-      baseDelay: 1000,
-      maxDelay: 30000,
-      multiplier: 2,
-      jitter: true,
-      jitterRange: 0.1,
+      baseDelay: this.config.defaults.baseDelay,
+      maxDelay: this.config.defaults.maxDelay,
+      multiplier: this.config.defaults.multiplier,
+      jitter: this.config.defaults.jitter,
+      jitterRange: this.config.defaults.jitterRange,
       ...strategy,
     };
 
     const retryOp: RetryOperation = {
       id: operationId,
       operation,
-      maxAttempts,
+      maxAttempts: maxAttempts || this.config.defaults.maxAttempts,
       currentAttempt: 0,
       strategy: fullStrategy,
       context,
@@ -122,13 +199,13 @@ export class RetryManagerService {
     const operation = this.retryOperations.get(operationId);
     if (operation) {
       this.retryOperations.delete(operationId);
-      
+
       this.eventEmitter.emit('retry.cancelled', {
         operationId,
         attempts: operation.currentAttempt,
         context: operation.context,
       });
-      
+
       return true;
     }
 
@@ -149,10 +226,15 @@ export class RetryManagerService {
   async executeWithCircuitBreaker<T>(
     circuitId: string,
     operation: () => Promise<T>,
-    threshold: number = 5,
-    timeout: number = 60000
+    threshold?: number,
+    timeout?: number
   ): Promise<T> {
-    const circuitState = this.getCircuitBreakerState(circuitId, threshold, timeout);
+    const circuitThreshold = threshold || this.config.circuitBreaker.defaultThreshold;
+    const circuitTimeout = Math.min(
+      Math.max(timeout || this.config.circuitBreaker.defaultTimeout, this.config.circuitBreaker.minTimeout),
+      this.config.circuitBreaker.maxTimeout
+    );
+    const circuitState = this.getCircuitBreakerState(circuitId, circuitThreshold, circuitTimeout);
 
     if (circuitState.state === 'OPEN') {
       if (Date.now() < (circuitState.nextAttemptTime?.getTime() || 0)) {
@@ -166,41 +248,41 @@ export class RetryManagerService {
 
     try {
       const result = await operation();
-      
+
       // Success - reset circuit breaker if it was HALF_OPEN
       if (circuitState.state === 'HALF_OPEN') {
         circuitState.state = 'CLOSED';
         circuitState.failureCount = 0;
         circuitState.lastFailureTime = undefined;
         circuitState.nextAttemptTime = undefined;
-        
+
         this.eventEmitter.emit('circuit-breaker.closed', {
           circuitId,
           previousFailures: circuitState.failureCount,
         });
-        
+
         this.logger.log(`Circuit breaker ${circuitId} reset to CLOSED`);
       }
-      
+
       return result;
     } catch (error) {
       // Failure - increment failure count
       circuitState.failureCount++;
       circuitState.lastFailureTime = new Date();
-      
-      if (circuitState.failureCount >= threshold) {
+
+      if (circuitState.failureCount >= circuitThreshold) {
         circuitState.state = 'OPEN';
-        circuitState.nextAttemptTime = new Date(Date.now() + timeout);
-        
+        circuitState.nextAttemptTime = new Date(Date.now() + circuitTimeout);
+
         this.eventEmitter.emit('circuit-breaker.opened', {
           circuitId,
           failureCount: circuitState.failureCount,
           nextAttemptTime: circuitState.nextAttemptTime,
         });
-        
+
         this.logger.warn(`Circuit breaker ${circuitId} OPENED after ${circuitState.failureCount} failures`);
       }
-      
+
       throw error;
     }
   }
@@ -220,7 +302,7 @@ export class RetryManagerService {
         });
 
         const result = await retryOp.operation();
-        
+
         this.eventEmitter.emit('retry.success', {
           operationId: retryOp.id,
           attempts: retryOp.currentAttempt,
@@ -234,7 +316,7 @@ export class RetryManagerService {
           error: error.message || String(error),
           timestamp: new Date(),
         };
-        
+
         retryOp.errors.push(errorInfo);
 
         this.eventEmitter.emit('retry.failed', {
@@ -298,13 +380,50 @@ export class RetryManagerService {
   }
 
   private calculateDelay(retryOp: RetryOperation): number {
+    const { strategy } = retryOp;
+
+    switch (strategy.type) {
+      case 'ADAPTIVE':
+        return this.calculateAdaptiveDelay(retryOp);
+      default:
+        return this.calculateStandardDelay(retryOp);
+    }
+  }
+
+  private calculateAdaptiveDelay(retryOp: RetryOperation): number {
+    if (!this.config.adaptive.enabled) {
+      return this.calculateStandardDelay(retryOp);
+    }
+
+    const baseDelay = retryOp.strategy.baseDelay;
+    const maxDelay = retryOp.strategy.maxDelay;
+
+    // Factor in recent error patterns
+    const recentErrors = retryOp.errors.slice(-this.config.adaptive.errorHistorySize);
+    const errorFrequency = recentErrors.length / Math.max(retryOp.currentAttempt, 1);
+
+    // Factor in system load (number of active retries)
+    const systemLoad = this.retryOperations.size;
+    const loadFactor = Math.min(1 + systemLoad * 0.1, this.config.adaptive.maxLoadMultiplier);
+
+    // Calculate adaptive delay with weighted factors
+    const errorPatternFactor = 1 + (errorFrequency * this.config.adaptive.errorPatternWeight);
+    const systemLoadFactor = 1 + ((loadFactor - 1) * this.config.adaptive.systemLoadWeight);
+
+    const adaptiveMultiplier = Math.pow(1.5, retryOp.currentAttempt - 1) * errorPatternFactor * systemLoadFactor;
+    const delay = Math.min(baseDelay * adaptiveMultiplier, maxDelay);
+
+    return Math.max(delay, this.config.defaults.minDelay);
+  }
+
+  private calculateStandardDelay(retryOp: RetryOperation): number {
     const { strategy, currentAttempt } = retryOp;
     let delay: number;
 
     switch (strategy.type) {
       case 'EXPONENTIAL':
         delay = Math.min(
-          strategy.baseDelay * Math.pow(strategy.multiplier || 2, currentAttempt - 1),
+          strategy.baseDelay * Math.pow(strategy.multiplier || this.config.defaults.multiplier, currentAttempt - 1),
           strategy.maxDelay
         );
         break;
@@ -320,42 +439,18 @@ export class RetryManagerService {
         delay = strategy.baseDelay;
         break;
 
-      case 'ADAPTIVE':
-        // Adaptive delay based on error patterns and system load
-        delay = this.calculateAdaptiveDelay(retryOp);
-        break;
-
       default:
         delay = strategy.baseDelay;
     }
 
     // Apply jitter if enabled
     if (strategy.jitter) {
-      const jitterRange = strategy.jitterRange || 0.1;
+      const jitterRange = strategy.jitterRange || this.config.defaults.jitterRange;
       const jitterFactor = 1 + (Math.random() - 0.5) * 2 * jitterRange;
       delay *= jitterFactor;
     }
 
-    return Math.floor(Math.max(delay, 100)); // Minimum 100ms
-  }
-
-  private calculateAdaptiveDelay(retryOp: RetryOperation): number {
-    const baseDelay = retryOp.strategy.baseDelay;
-    const maxDelay = retryOp.strategy.maxDelay;
-    
-    // Factor in recent error patterns
-    const recentErrors = retryOp.errors.slice(-3); // Last 3 errors
-    const errorFrequency = recentErrors.length / Math.max(retryOp.currentAttempt, 1);
-    
-    // Factor in system load (number of active retries)
-    const systemLoad = this.retryOperations.size;
-    const loadFactor = Math.min(1 + systemLoad * 0.1, 3); // Max 3x multiplier
-    
-    // Calculate adaptive delay
-    const adaptiveMultiplier = Math.pow(1.5, retryOp.currentAttempt - 1) * (1 + errorFrequency) * loadFactor;
-    const delay = Math.min(baseDelay * adaptiveMultiplier, maxDelay);
-    
-    return delay;
+    return Math.floor(Math.max(delay, this.config.defaults.minDelay));
   }
 
   private getCircuitBreakerState(circuitId: string, threshold: number, timeout: number): CircuitBreakerState {
@@ -385,10 +480,10 @@ export class RetryManagerService {
       circuit.failureCount = 0;
       circuit.lastFailureTime = undefined;
       circuit.nextAttemptTime = undefined;
-      
+
       this.eventEmitter.emit('circuit-breaker.reset', { circuitId });
       this.logger.log(`Circuit breaker ${circuitId} manually reset`);
-      
+
       return true;
     }
     return false;

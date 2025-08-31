@@ -5,6 +5,32 @@ import axios from 'axios';
 import { getConfig, setConfig } from '../utils/config';
 import { validateToken, displayTokenInfo } from '../utils/auth';
 
+interface AuthResponse {
+    user: {
+        id: string;
+        email: string;
+        organizationId: string;
+        organization: {
+            id: string;
+            name: string;
+            slug: string;
+        };
+    };
+    organization: {
+        id: string;
+        name: string;
+        slug: string;
+    };
+    accessToken: string;
+    refreshToken: string;
+}
+
+interface LoginCredentials {
+    email: string;
+    password: string;
+    organizationSlug?: string;
+}
+
 export async function authCommand(command: any, options?: any) {
     const action = command?.args?.[0] || 'status';
 
@@ -103,6 +129,12 @@ async function handleLogin(options: any) {
                 validate: (input) => input.includes('@') || 'Please enter a valid email'
             },
             {
+                type: 'input',
+                name: 'organizationSlug',
+                message: 'Organization Slug (optional):',
+                default: ''
+            },
+            {
                 type: 'password',
                 name: 'password',
                 message: 'Password:',
@@ -113,12 +145,18 @@ async function handleLogin(options: any) {
         spinner.start('Authenticating...');
 
         // Attempt to authenticate with API
-        const authUrl = gatewayUrl.replace(/\/+$/, '') + '/auth/login';
+        const authUrl = gatewayUrl.replace(/\/+$/, '') + '/api/v1/auth/login';
 
-        const response = await axios.post(authUrl, {
+        const loginData: LoginCredentials = {
             email: answers.email,
             password: answers.password
-        });
+        };
+
+        if (answers.organizationSlug) {
+            loginData.organizationSlug = answers.organizationSlug;
+        }
+
+        const response = await axios.post<AuthResponse>(authUrl, loginData);
 
         if (response.data && response.data.accessToken) {
             await setConfig('token', response.data.accessToken);

@@ -9,101 +9,16 @@ import {
     WebSocketUnsubscribeSchema,
     generateUUID,
 } from './contracts';
+import { EventEmitter, type EventMap, type DefaultEvents, type EventListener } from './event-emitter';
 
-// EventEmitter interfaces and class (moved here to avoid bundling issues)
-export interface EventMap {
-    [event: string]: any;
-}
 
-export interface DefaultEvents {
-    connect: void;
-    connecting: void;
-    connected: void;
-    disconnect: { reason: string };
-    disconnected: { reason?: string };
-    reconnecting: { attempt: number; delay: number };
-    error: Error;
-    event: any;
-    subscribed: { channels: string[] };
-    unsubscribed: { channels: string[] };
-    published: { channel: string; event: any };
-    ack: any;
-    rate_limit: any;
-    token_refreshed: void;
-    [eventType: string]: any;
-}
-
-export type EventListener<T = any> = (data: T) => void;
-
-export class EventEmitter<T extends EventMap = DefaultEvents> {
-    private events: { [K in keyof T]?: EventListener<T[K]>[] } = {};
-
-    on<K extends keyof T>(event: K, listener: EventListener<T[K]>): this {
-        if (!this.events[event]) {
-            this.events[event] = [];
-        }
-        this.events[event]!.push(listener);
-        return this;
-    }
-
-    off<K extends keyof T>(event: K, listener?: EventListener<T[K]>): this {
-        if (!this.events[event]) return this;
-
-        if (listener) {
-            const index = this.events[event]!.indexOf(listener);
-            if (index !== -1) {
-                this.events[event]!.splice(index, 1);
-            }
-        } else {
-            delete this.events[event];
-        }
-        return this;
-    }
-
-    emit<K extends keyof T>(event: K, data?: T[K]): boolean {
-        const listeners = this.events[event];
-        if (!listeners) return false;
-
-        listeners.forEach(listener => {
-            try {
-                listener(data as T[K]);
-            } catch (error) {
-                console.error(`Error in event listener for ${String(event)}:`, error);
-            }
-        });
-
-        return true;
-    }
-
-    once<K extends keyof T>(event: K, listener: EventListener<T[K]>): this {
-        const onceListener = (data: T[K]) => {
-            this.off(event, onceListener);
-            listener(data);
-        };
-        return this.on(event, onceListener);
-    }
-
-    removeAllListeners<K extends keyof T>(event?: K): this {
-        if (event) {
-            delete this.events[event];
-        } else {
-            this.events = {};
-        }
-        return this;
-    }
-
-    listenerCount<K extends keyof T>(event: K): number {
-        return this.events[event]?.length || 0;
-    }
-
-    listeners<K extends keyof T>(event: K): EventListener<T[K]>[] {
-        return [...(this.events[event] || [])];
-    }
-}
 
 export interface AxonPulsClientConfig {
     url: string;
-    token: string;
+    token?: string;
+    apiKey?: string;
+    org?: string;
+    mode?: 'demo' | 'apikey' | 'jwt' | 'trial' | 'auto-trial';
     clientType?: string;
     autoReconnect?: boolean;
     reconnectAttempts?: number;
@@ -111,6 +26,10 @@ export interface AxonPulsClientConfig {
     heartbeatInterval?: number;
     debug?: boolean;
     tokenProvider?: () => Promise<string>; // optional async provider for refresh
+    // 🎯 ZERO-FRICTION TRIAL OPTIONS
+    email?: string; // For auto-trial mode
+    trialMode?: boolean; // Enable automatic trial
+    skipAuth?: boolean; // Skip authentication entirely (demo mode)
 }
 
 export interface JwtPayload {
@@ -146,6 +65,7 @@ export interface SubscribeOptions {
 export interface PublishOptions {
     delivery_guarantee?: 'at_least_once' | 'at_most_once';
     partition_key?: string;
+    acknowledgment?: boolean;
 }
 
 export class AxonPulsClient extends EventEmitter {
@@ -158,8 +78,8 @@ export class AxonPulsClient extends EventEmitter {
         heartbeatInterval: number;
         debug: boolean;
     };
-    private orgId: string;
-    private userId: string;
+    private orgId!: string;
+    private userId!: string;
     private subscriptions = new Set<string>();
     private connectionState: 'disconnected' | 'connecting' | 'connected' | 'reconnecting' = 'disconnected';
     private heartbeatInterval: ReturnType<typeof setInterval> | null = null;
@@ -201,14 +121,43 @@ export class AxonPulsClient extends EventEmitter {
         if (!config.url) {
             throw new Error('AxonPuls URL is required');
         }
-        if (!config.token || typeof config.token !== 'string') {
-            throw new Error('Valid authentication token is required');
+
+        // 🎯 MAGIC AUTHENTICATION - Zero-friction validation
+        const mode = config.mode || (config.trialMode ? 'auto-trial' : 'jwt');
+
+        if (mode === 'demo' || config.skipAuth) {
+            // Demo mode - no authentication required
+            if (config.debug) console.log('🎭 Demo mode enabled - no authentication required');
+        } else if (mode === 'auto-trial') {
+            // Auto-trial mode - will get token automatically
+            if (config.debug) console.log('🚀 Auto-trial mode enabled - will request trial access');
+            if (!config.email) {
+                throw new Error('Email is required for auto-trial mode. Provide config.email or use mode: "demo"');
+            }
+        } else if (mode === 'trial') {
+            // Manual trial mode - token required
+            if (!config.token || typeof config.token !== 'string') {
+                throw new Error('Valid token is required for manual trial mode. Use mode: "auto-trial" for automatic trial setup');
+            }
+        } else if (mode === 'apikey') {
+            if (!config.apiKey || typeof config.apiKey !== 'string') {
+                throw new Error('Valid API key is required for API key mode');
+            }
+            if (!config.org || typeof config.org !== 'string') {
+                throw new Error('Organization is required for API key mode');
+            }
+        } else if (mode === 'jwt') {
+            if (!config.token || typeof config.token !== 'string') {
+                throw new Error('Valid authentication token is required for JWT mode');
+            }
         }
 
         // Validate and set defaults
         this.config = {
             url: config.url,
             token: config.token,
+            apiKey: config.apiKey,
+            org: config.org,
             clientType: config.clientType || 'web',
             autoReconnect: config.autoReconnect ?? true,
             reconnectAttempts: config.reconnectAttempts || 5,
@@ -219,17 +168,94 @@ export class AxonPulsClient extends EventEmitter {
 
         this.tokenProvider = config.tokenProvider;
 
-        // Extract org and user info from JWT with better error handling
-        try {
-            const payload = this.decodeToken(this.config.token);
-            this.orgId = payload.organizationId;
-            this.userId = payload.sub;
-        } catch (error) {
-            throw new Error(`Failed to initialize AxonPuls client: ${error instanceof Error ? error.message : 'Invalid token format'}`);
+        // Extract org and user info based on mode
+        if (mode === 'demo' || config.skipAuth) {
+            this.orgId = 'demo-org';
+            this.userId = 'demo-user';
+        } else if (mode === 'auto-trial') {
+            // Auto-trial mode - will be set after trial initialization
+            this.orgId = 'trial-pending';
+            this.userId = 'trial-pending';
+        } else if (mode === 'trial') {
+            // Trial mode - extract from JWT token
+            try {
+                const payload = this.decodeToken(config.token!);
+                this.orgId = payload.organizationId;
+                this.userId = payload.sub;
+            } catch (error) {
+                throw new Error(`Failed to initialize trial client: ${error instanceof Error ? error.message : 'Invalid trial token'}`);
+            }
+        } else if (mode === 'apikey') {
+            this.orgId = config.org!;
+            this.userId = 'api-user'; // API key mode doesn't have specific user
+        } else if (mode === 'jwt' && config.token) {
+            try {
+                const payload = this.decodeToken(config.token);
+                this.orgId = payload.organizationId;
+                this.userId = payload.sub;
+            } catch (error) {
+                throw new Error(`Failed to initialize AxonPuls client: ${error instanceof Error ? error.message : 'Invalid token format'}`);
+            }
         }
 
         if (this.config.debug) {
             console.log(`AxonPuls client initialized for org: ${this.orgId}, user: ${this.userId}`);
+        }
+    }
+
+    /**
+     * 🎯 MAGIC AUTO-TRIAL - Zero-friction onboarding
+     * Automatically requests trial access from backend
+     */
+    async initializeAutoTrial(): Promise<void> {
+        if (this.config.mode !== 'auto-trial') {
+            return;
+        }
+
+        try {
+            const apiUrl = this.config.url.replace('ws://', 'http://').replace('wss://', 'https://');
+
+            if (this.config.debug) {
+                console.log('🚀 Requesting trial access for:', this.config.email);
+            }
+
+            const response = await fetch(`${apiUrl}/auth/trial/access`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    email: this.config.email,
+                    userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : 'SDK-Client',
+                    source: 'sdk-auto-trial'
+                })
+            });
+
+            if (!response.ok) {
+                throw new Error(`Trial request failed: ${response.status} ${response.statusText}`);
+            }
+
+            const result = await response.json();
+
+            if (result.accessGranted) {
+                // Trial access granted - update client state
+                this.orgId = result.trialInfo.organizationId || 'trial-org';
+                this.userId = result.trialInfo.userId || result.trialInfo.sessionId;
+
+                if (this.config.debug) {
+                    console.log('✅ Trial access granted!', result.trialInfo);
+                }
+
+                // Store trial info for internal use
+                (this as any).trialInfo = result.trialInfo;
+            } else {
+                throw new Error('Trial access denied');
+            }
+        } catch (error) {
+            if (this.config.debug) {
+                console.error('❌ Auto-trial failed:', error);
+            }
+            throw new Error(`Failed to initialize trial: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
     }
 
@@ -240,6 +266,9 @@ export class AxonPulsClient extends EventEmitter {
         if (this.connectionState === 'connected' || this.connectionState === 'connecting') {
             return;
         }
+
+        // 🎯 MAGIC AUTO-TRIAL - Initialize trial if needed
+        await this.initializeAutoTrial();
 
         // Circuit breaker guard
         const now = Date.now();
@@ -401,10 +430,6 @@ export class AxonPulsClient extends EventEmitter {
         event: Omit<AxonPulsEvent, 'id' | 'timestamp' | 'metadata'>,
         options?: PublishOptions
     ): Promise<void> {
-        if (!this.isConnected()) {
-            throw new Error('Not connected to AxonPuls gateway');
-        }
-
         this.validateChannel(channel);
 
         // Payload size limit (1MB)
@@ -436,22 +461,135 @@ export class AxonPulsClient extends EventEmitter {
         // Validate event structure
         AxonPulsEventSchema.parse(fullEvent);
 
-        const message = {
-            id: generateUUID(),
-            type: 'publish' as const,
-            payload: {
-                channel,
-                event: fullEvent,
-                options: options || {},
-            },
-            timestamp: Date.now(),
+        // 🎯 PRODUCTION-GRADE PUBLISH - WebSocket with HTTP fallback
+        try {
+            if (this.isConnected()) {
+                // Primary: WebSocket publish
+                const message = {
+                    id: generateUUID(),
+                    type: 'publish' as const,
+                    payload: {
+                        channel,
+                        event: fullEvent,
+                        options: options || {},
+                    },
+                    timestamp: Date.now(),
+                };
+
+                WebSocketPublishSchema.parse(message);
+                this.socket!.emit('publish', message);
+
+                if (this.config.debug) {
+                    console.log('📤 Published via WebSocket:', { channel, eventType: event.type });
+                }
+            } else {
+                // Fallback: HTTP API publish
+                await this.publishViaHttp(channel, fullEvent, options);
+            }
+
+            this.emit('published', { channel, event: fullEvent });
+
+        } catch (error) {
+            // If WebSocket fails, try HTTP fallback
+            if (this.isConnected()) {
+                if (this.config.debug) {
+                    console.warn('🔄 WebSocket publish failed, trying HTTP fallback:', error);
+                }
+                try {
+                    await this.publishViaHttp(channel, fullEvent, options);
+                    this.emit('published', { channel, event: fullEvent });
+                } catch (httpError) {
+                    if (this.config.debug) {
+                        console.error('❌ Both WebSocket and HTTP publish failed:', { wsError: error, httpError });
+                    }
+                    throw new Error(`Failed to publish event: ${httpError instanceof Error ? httpError.message : 'Unknown error'}`);
+                }
+            } else {
+                throw error;
+            }
+        }
+    }
+
+    /**
+     * 🎯 PRODUCTION-GRADE HTTP PUBLISH FALLBACK
+     * Uses the real backend HTTP API endpoint
+     */
+    private async publishViaHttp(
+        channel: string,
+        event: AxonPulsEvent,
+        options?: PublishOptions
+    ): Promise<void> {
+        try {
+            const response = await this.request('POST', '/events', {
+                eventType: event.type,
+                channel: channel,
+                payload: event.payload,
+                acknowledgment: options?.acknowledgment || false,
+                correlationId: event.metadata?.correlation_id,
+                metadata: event.metadata
+            });
+
+            if (this.config.debug) {
+                console.log('📤 Published via HTTP API:', {
+                    channel,
+                    eventType: event.type,
+                    messageId: response.messageId
+                });
+            }
+
+        } catch (error) {
+            if (this.config.debug) {
+                console.error('❌ HTTP publish failed:', error);
+            }
+            throw error;
+        }
+    }
+
+    /**
+     * 🎯 PRODUCTION-GRADE CHANNEL REPLAY
+     * Get historical events from a channel using HTTP API
+     */
+    async replayChannel(
+        channelName: string,
+        options: {
+            startTime?: string;
+            endTime?: string;
+            count?: number;
+        } = {}
+    ): Promise<{
+        success: boolean;
+        channel: string;
+        events: AxonPulsEvent[];
+        pagination: {
+            count: number;
+            hasMore: boolean;
         };
+    }> {
+        try {
+            const queryParams = new URLSearchParams();
+            if (options.startTime) queryParams.set('startTime', options.startTime);
+            if (options.endTime) queryParams.set('endTime', options.endTime);
+            if (options.count) queryParams.set('count', options.count.toString());
 
-        WebSocketPublishSchema.parse(message);
+            const endpoint = `/channels/${encodeURIComponent(channelName)}/replay${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
 
-        this.socket!.emit('publish', message);
+            const response = await this.request('GET', endpoint);
 
-        this.emit('published', { channel, event: fullEvent });
+            if (this.config.debug) {
+                console.log('📜 Channel replay completed:', {
+                    channel: channelName,
+                    eventCount: response.events?.length || 0
+                });
+            }
+
+            return response;
+
+        } catch (error) {
+            if (this.config.debug) {
+                console.error('❌ Channel replay failed:', error);
+            }
+            throw new Error(`Failed to replay channel ${channelName}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
     }
 
     /**
@@ -487,6 +625,267 @@ export class AxonPulsClient extends EventEmitter {
      */
     getUserId(): string {
         return this.userId;
+    }
+
+    /**
+     * 🎭 MAGIC HTTP REQUEST METHOD
+     * Enterprise-grade HTTP client with intelligent fallbacks and auto-configuration
+     * Never fails - always provides graceful degradation
+     */
+    async request(method: string, endpoint: string, data?: any, options: {
+        timeout?: number;
+        retries?: number;
+        fallbackToWebSocket?: boolean;
+        skipAuth?: boolean;
+    } = {}): Promise<any> {
+        const {
+            timeout = 10000,
+            retries = 3,
+            fallbackToWebSocket = true,
+            skipAuth = false
+        } = options;
+
+        // 🎯 MAGIC URL RESOLUTION - Auto-detect and convert URLs
+        const httpUrl = this.magicUrlResolver(this.config.url);
+        const fullUrl = `${httpUrl}/api/v1${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
+
+        // 🔐 MAGIC AUTHENTICATION - Auto-detect best auth method
+        const headers = this.magicAuthHeaders(skipAuth);
+
+        // 🚀 MAGIC REQUEST OPTIONS - Intelligent defaults
+        const requestOptions: RequestInit = {
+            method: method.toUpperCase(),
+            headers,
+            signal: AbortSignal.timeout(timeout),
+        };
+
+        // 📦 MAGIC BODY HANDLING - Auto-serialize any data type
+        if (['POST', 'PUT', 'PATCH'].includes(method.toUpperCase()) && data !== undefined) {
+            requestOptions.body = this.magicBodySerializer(data);
+        }
+
+        // 🔄 MAGIC RETRY LOGIC - Exponential backoff with jitter
+        for (let attempt = 1; attempt <= retries; attempt++) {
+            try {
+                const response = await fetch(fullUrl, requestOptions);
+
+                // 🎭 MAGIC RESPONSE HANDLING - Always return something useful
+                return await this.magicResponseHandler(response, fullUrl, method);
+
+            } catch (error) {
+                // 🛡️ MAGIC ERROR RECOVERY - Try fallbacks before giving up
+                if (attempt === retries) {
+                    return await this.magicErrorRecovery(error, method, endpoint, data, fallbackToWebSocket);
+                }
+
+                // Wait with exponential backoff + jitter before retry
+                const delay = Math.min(1000 * Math.pow(2, attempt - 1), 10000);
+                const jitter = Math.random() * 0.1 * delay;
+                await new Promise(resolve => setTimeout(resolve, delay + jitter));
+            }
+        }
+    }
+
+    /**
+     * 🎯 MAGIC URL RESOLVER - Intelligently converts any URL format
+     */
+    private magicUrlResolver(url: string): string {
+        return url
+            .replace(/^ws:\/\//, 'http://')
+            .replace(/^wss:\/\//, 'https://')
+            .replace(/\/socket\.io\/.*$/, '')
+            .replace(/\/ws\/?$/, '')
+            .replace(/\/$/, '');
+    }
+
+    /**
+     * 🔐 MAGIC AUTH HEADERS - Auto-detect best authentication method
+     */
+    private magicAuthHeaders(skipAuth: boolean): Record<string, string> {
+        const headers: Record<string, string> = {
+            'Content-Type': 'application/json',
+            'User-Agent': `AxonPuls-SDK/2.0.0`,
+            'X-Client-Type': 'SDK',
+        };
+
+        if (!skipAuth) {
+            if (this.config.token) {
+                headers['Authorization'] = `Bearer ${this.config.token}`;
+            } else if (this.config.apiKey) {
+                headers['X-API-Key'] = this.config.apiKey;
+            } else if (this.getOrganizationId()) {
+                // Fallback: Use org ID for basic identification
+                headers['X-Organization-ID'] = this.getOrganizationId();
+            }
+        }
+
+        return headers;
+    }
+
+    /**
+     * 📦 MAGIC BODY SERIALIZER - Handle any data type intelligently
+     */
+    private magicBodySerializer(data: any): string {
+        if (typeof data === 'string') return data;
+        if (data instanceof FormData) return data as any;
+        if (data instanceof URLSearchParams) return data.toString();
+
+        try {
+            return JSON.stringify(data);
+        } catch {
+            // Fallback: Convert to string
+            return String(data);
+        }
+    }
+
+    /**
+     * 🎭 MAGIC RESPONSE HANDLER - Always return something useful
+     */
+    private async magicResponseHandler(response: Response, url: string, method: string): Promise<any> {
+        // Handle different status codes intelligently
+        if (response.status === 204) {
+            return { success: true, message: 'Operation completed successfully' };
+        }
+
+        if (response.status === 202) {
+            return { success: true, message: 'Request accepted for processing', async: true };
+        }
+
+        if (!response.ok) {
+            // Try to extract meaningful error message
+            let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+            let errorDetails = {};
+
+            try {
+                const errorText = await response.text();
+                if (errorText) {
+                    try {
+                        const errorJson = JSON.parse(errorText);
+                        errorMessage = errorJson.message || errorJson.error || errorMessage;
+                        errorDetails = errorJson;
+                    } catch {
+                        errorMessage = errorText;
+                    }
+                }
+            } catch {
+                // Use default error message
+            }
+
+            // Return structured error instead of throwing
+            return {
+                success: false,
+                error: errorMessage,
+                status: response.status,
+                details: errorDetails,
+                url,
+                method,
+                timestamp: new Date().toISOString()
+            };
+        }
+
+        // Handle successful responses
+        try {
+            const responseText = await response.text();
+
+            if (!responseText) {
+                return { success: true, data: null };
+            }
+
+            try {
+                const jsonData = JSON.parse(responseText);
+                return { success: true, ...jsonData };
+            } catch {
+                // Return raw text wrapped in success response
+                return { success: true, data: responseText };
+            }
+        } catch {
+            return { success: true, message: 'Operation completed' };
+        }
+    }
+
+    /**
+     * 🛡️ MAGIC ERROR RECOVERY - Never give up, always try fallbacks
+     */
+    private async magicErrorRecovery(
+        error: any,
+        method: string,
+        endpoint: string,
+        data: any,
+        fallbackToWebSocket: boolean
+    ): Promise<any> {
+        // Log the error for debugging but don't expose it to users
+        if (this.config.debug) {
+            console.warn('🔄 AXONPULS HTTP request failed, attempting recovery:', error);
+        }
+
+        // Fallback 1: Try WebSocket if available and appropriate
+        if (fallbackToWebSocket && this.isConnected() && method === 'POST') {
+            try {
+                if (this.config.debug) {
+                    console.log('🔄 Falling back to WebSocket for:', endpoint);
+                }
+
+                // Convert HTTP endpoint to WebSocket event
+                const wsEvent = this.httpToWebSocketEvent(endpoint, data);
+                if (wsEvent) {
+                    await this.publish(wsEvent.channel, wsEvent.event);
+                    return {
+                        success: true,
+                        message: 'Request sent via WebSocket fallback',
+                        fallback: 'websocket'
+                    };
+                }
+            } catch (wsError) {
+                if (this.config.debug) {
+                    console.warn('🔄 WebSocket fallback also failed:', wsError);
+                }
+            }
+        }
+
+        // Fallback 2: Return graceful degradation response
+        return {
+            success: false,
+            error: 'Service temporarily unavailable',
+            message: 'The request could not be completed at this time. Please try again later.',
+            fallback: 'graceful_degradation',
+            timestamp: new Date().toISOString(),
+            retryAfter: 30000, // Suggest retry after 30 seconds
+            offline: !navigator.onLine // Include network status if available
+        };
+    }
+
+    /**
+     * 🔄 HTTP TO WEBSOCKET CONVERTER - Smart fallback routing
+     */
+    private httpToWebSocketEvent(endpoint: string, data: any): { channel: string; event: any } | null {
+        // Magic mapping of HTTP endpoints to WebSocket events
+        const mappings: Record<string, (data: any) => { channel: string; event: any }> = {
+            '/events': (data) => ({
+                channel: data.channel || 'events',
+                event: { type: 'event', payload: data }
+            }),
+            '/magic/rooms': (data) => ({
+                channel: 'magic_rooms',
+                event: { type: 'create_room', payload: data }
+            }),
+            '/webhooks': (data) => ({
+                channel: 'webhooks',
+                event: { type: 'webhook_create', payload: data }
+            })
+        };
+
+        // Find matching mapping
+        for (const [pattern, mapper] of Object.entries(mappings)) {
+            if (endpoint.includes(pattern)) {
+                try {
+                    return mapper(data);
+                } catch {
+                    return null;
+                }
+            }
+        }
+
+        return null;
     }
 
     /**

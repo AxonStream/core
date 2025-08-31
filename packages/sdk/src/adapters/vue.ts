@@ -11,6 +11,7 @@
 
 import type { AxonPulsClient, AxonPulsEvent } from '../core/client';
 import type { FrameworkAdapter } from './index';
+import { isVueEnvironment } from '../utils/framework-detection';
 
 // Vue binding interface
 export interface VueBinding {
@@ -369,10 +370,73 @@ export function createVueBinding(client: AxonPulsClient): VueBinding {
             AxonChat,
             AxonPresence,
             AxonHITL: {
-                template: '<div>HITL Component</div>'
+                template: '<div ref="hitlContainer"></div>',
+                props: ['department', 'client', 'currentUser', 'autoAcceptRoles', 'showPriority'],
+                data() {
+                    return {
+                        hitlInstance: null,
+                        loading: true
+                    };
+                },
+                async mounted() {
+                    try {
+                        const { AxonHITL } = await import('../ui/components/hitl');
+                        this.hitlInstance = new AxonHITL({
+                            department: this.department || 'general',
+                            client: this.client,
+                            currentUser: this.currentUser,
+                            autoAcceptRoles: this.autoAcceptRoles,
+                            showPriority: this.showPriority !== false,
+                            theme: 'auto'
+                        });
+                        this.hitlInstance.mount(this.$refs.hitlContainer);
+                        this.loading = false;
+                    } catch (error) {
+                        console.error('Failed to load HITL component:', error);
+                        this.$refs.hitlContainer.innerHTML = '<div style="padding: 20px; color: #e74c3c;">Failed to load HITL component</div>';
+                    }
+                },
+                beforeUnmount() {
+                    if (this.hitlInstance) {
+                        this.hitlInstance.unmount();
+                        this.hitlInstance = null;
+                    }
+                }
             },
             AxonEmbed: {
-                template: '<div>Embed Component</div>'
+                template: '<div ref="embedContainer"></div>',
+                props: ['token', 'channel', 'org', 'features', 'width', 'height'],
+                data() {
+                    return {
+                        embedInstance: null,
+                        loading: true
+                    };
+                },
+                async mounted() {
+                    try {
+                        const { AxonEmbed } = await import('../ui/components/embed');
+                        this.embedInstance = new AxonEmbed({
+                            el: this.$refs.embedContainer,
+                            token: this.token,
+                            channel: this.channel,
+                            org: this.org,
+                            features: this.features || ['chat'],
+                            width: this.width || '400px',
+                            height: this.height || '500px',
+                            theme: 'auto'
+                        });
+                        this.loading = false;
+                    } catch (error) {
+                        console.error('Failed to load Embed component:', error);
+                        this.$refs.embedContainer.innerHTML = '<div style="padding: 20px; color: #e74c3c;">Failed to load Embed component</div>';
+                    }
+                },
+                beforeUnmount() {
+                    if (this.embedInstance) {
+                        this.embedInstance.unmount();
+                        this.embedInstance = null;
+                    }
+                }
             },
         },
     };
@@ -383,12 +447,7 @@ export const VueAdapter: FrameworkAdapter = {
     name: 'vue',
     version: '1.0.0',
     detectFramework() {
-        try {
-            return !!(typeof window !== 'undefined' && (window as any).Vue) ||
-                !!(typeof require !== 'undefined' && require('vue'));
-        } catch {
-            return false;
-        }
+        return isVueEnvironment();
     },
     createBinding(client: AxonPulsClient) {
         return createVueBinding(client);

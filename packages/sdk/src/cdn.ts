@@ -6,11 +6,25 @@
  */
 
 import {
-    AxonPulsClient,
-    createAxonPulsClient,
-    createFrameworkBinding,
-    detectFramework
+    AxonPulsClient
 } from './index';
+
+// 🚧 CDN BUILD TEMPORARILY DISABLED
+// This module needs factory functions that don't exist yet
+// Will be re-enabled after implementing missing functions
+
+// Simple factory function for now
+function createAxonPulsClient(config?: any) {
+    return new AxonPulsClient(config || {});
+}
+
+function detectFramework() {
+    return { framework: 'vanilla', version: '1.0.0' };
+}
+
+function createFrameworkBinding() {
+    return {};
+}
 
 // Import all UI components for CDN
 import {

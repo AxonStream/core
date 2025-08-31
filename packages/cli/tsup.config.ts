@@ -1,7 +1,10 @@
 import { defineConfig } from 'tsup'
 
 export default defineConfig({
-  entry: { cli: 'src/cli.ts' },
+  entry: { 
+    index: 'src/index.ts',
+    cli: 'src/cli.ts' 
+  },
   outDir: 'dist',
   format: ['cjs'],
   platform: 'node',
@@ -11,8 +14,8 @@ export default defineConfig({
   minify: false,
   clean: true,
   shims: true,
-  dts: false,
+  dts: true,
   banner: { js: '#!/usr/bin/env node' },
-  outExtension: () => ({ js: '.cjs' }),
+  outExtension: () => ({ js: '.js' }),
   external: ['@axonstream/core', 'commander', 'chalk', 'dotenv', 'jwt-decode']
 })

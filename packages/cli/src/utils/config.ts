@@ -3,7 +3,7 @@ import { homedir } from 'os';
 import { join } from 'path';
 import chalk from 'chalk';
 
-interface CliConfig {
+export interface CliConfig {
     gateway_url?: string;
     token?: string;
     organization_id?: string;
@@ -13,11 +13,12 @@ interface CliConfig {
     debug?: boolean;
 }
 
+// Production-grade configuration with environment variable support
 const DEFAULT_CONFIG: CliConfig = {
-    default_output_format: 'json',
-    auto_reconnect: true,
-    heartbeat_interval: 30,
-    debug: false,
+    default_output_format: (process.env.AXON_CLI_OUTPUT_FORMAT as 'json' | 'table' | 'raw') || 'json',
+    auto_reconnect: process.env.AXON_CLI_AUTO_RECONNECT !== 'false',
+    heartbeat_interval: parseInt(process.env.AXON_CLI_HEARTBEAT_INTERVAL || '30'),
+    debug: process.env.AXON_CLI_DEBUG === 'true',
 };
 
 function getConfigPath(): string {
@@ -59,10 +60,15 @@ export async function setConfig(key: string, value: any): Promise<void> {
     switch (key) {
         case 'auto_reconnect':
         case 'debug':
-            config[key as keyof CliConfig] = value === 'true' || value === true ? true : false;
+            (config as any)[key] = value === 'true' || value === true ? true : false;
             break;
         case 'heartbeat_interval':
-            config[key as keyof CliConfig] = parseInt(value, 10) || 30;
+            (config as any)[key] = parseInt(value, 10) || 30;
+            break;
+        case 'default_output_format':
+            if (['json', 'table', 'raw'].includes(value)) {
+                (config as any)[key] = value;
+            }
             break;
         default:
             (config as any)[key] = value;

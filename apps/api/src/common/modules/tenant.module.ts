@@ -9,6 +9,9 @@ import { TenantAwareService } from '../services/tenant-aware.service';
 import { TenantDatabaseService } from '../services/tenant-database.service';
 import { PrismaService } from '../services/prisma.service';
 import { RedisService } from '../services/redis.service';
+import { TenantJwtService } from '../services/tenant-jwt.service';
+import { TenantRoomService } from '../services/tenant-room.service';
+import { TenantRateLimitService } from '../services/tenant-rate-limit.service';
 
 // Guards
 import { TenantIsolationGuard } from '../guards/tenant-isolation.guard';
@@ -50,10 +53,14 @@ import { tenantConfig } from '../../config/tenant.config';
     PrismaService,
     RedisService,
 
+    // Shared utility services
+    TenantJwtService,
+    TenantRoomService,
+    TenantRateLimitService,
+
     // Guards
     TenantIsolationGuard,
     TenantWebSocketGuard,
-    TenantResourceLimitGuard,
     // Interceptors
     TenantWebSocketInterceptor,
 
@@ -213,6 +220,11 @@ import { tenantConfig } from '../../config/tenant.config';
     TenantWebSocketInterceptor,
     PrismaService,
     RedisService,
+
+    // Export shared utility services
+    TenantJwtService,
+    TenantRoomService,
+    TenantRateLimitService,
   ],
 })
 export class TenantModule implements NestModule {

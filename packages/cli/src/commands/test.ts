@@ -97,8 +97,9 @@ async function testAuthentication(options?: any) {
 
         spinner.succeed('Authentication test passed');
         console.log(chalk.green('✅ Authentication: OK'));
-        console.log(chalk.blue(`   Organization: ${tokenInfo.payload.organizationId}`));
-        console.log(chalk.blue(`   User: ${tokenInfo.payload.sub}`));
+        const organizationId = tokenInfo.payload?.organizationId || tokenInfo.payload?.orgId;
+        console.log(chalk.blue(`   Organization: ${organizationId}`));
+        console.log(chalk.blue(`   User: ${tokenInfo.payload?.sub}`));
 
     } catch (error: any) {
         spinner.fail('Authentication test failed');

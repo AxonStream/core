@@ -16,6 +16,9 @@ export interface JwtPayload {
   permissions?: string[];
   iat?: number;
   exp?: number;
+  isTrial?: boolean;
+  trialStartedAt?: Date;
+  expiresAt?: Date;
 }
 
 export interface AuthResult {
@@ -332,8 +335,8 @@ export class AuthService {
   }
 
   private async handleFailedLogin(userId: string): Promise<void> {
-    const maxAttempts = 5;
-    const lockoutDuration = 15 * 60 * 1000; // 15 minutes
+    const maxAttempts = this.configService.get<number>('auth.security.maxFailedAttempts', 5);
+    const lockoutDuration = this.configService.get<number>('auth.security.lockoutDurationMs', 15 * 60 * 1000); // 15 minutes default
 
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
@@ -481,6 +484,263 @@ export class AuthService {
       }
     } catch (error) {
       this.logger.error(`Failed to assign default role: ${error.message}`);
+    }
+  }
+
+  // ============================================================================
+  // TRIAL TOKEN METHODS - ZERO FRICTION ONBOARDING
+  // ============================================================================
+
+  /**
+   * Generate invisible trial access - zero friction onboarding
+   * User gets access without seeing tokens, secured by email + IP
+   */
+  async generateTrialAccess(email: string, ipAddress: string, userAgent: string): Promise<{ accessGranted: boolean; trialInfo: any }> {
+    try {
+      // Check if this email/IP already has an active trial
+      const existingTrial = await this.checkExistingTrial(email, ipAddress);
+      if (existingTrial) {
+        return {
+          accessGranted: true,
+          trialInfo: {
+            sessionId: existingTrial.id,
+            expiresAt: existingTrial.expiresAt,
+            message: 'Welcome back! Your trial is still active.',
+            limitations: this.getTrialLimitations()
+          }
+        };
+      }
+
+      // Create new trial session
+      const trialSession = await this.createTrialSession(email, ipAddress, userAgent);
+
+      return {
+        accessGranted: true,
+        trialInfo: {
+          sessionId: trialSession.id,
+          expiresAt: trialSession.expiresAt,
+          message: 'Trial access granted! You can now use AxonStream immediately.',
+          limitations: this.getTrialLimitations(),
+          features: this.getTrialFeatures(),
+          nextSteps: {
+            docs: 'https://docs.axonstream.ai',
+            examples: 'https://github.com/axonstream/examples',
+            upgrade: '/auth/register'
+          }
+        }
+      };
+    } catch (error) {
+      this.logger.error(`Failed to generate trial access: ${error.message}`);
+      throw new Error('Failed to setup trial environment');
+    }
+  }
+
+  /**
+   * Check if email/IP combination already has active trial
+   */
+  private async checkExistingTrial(email: string, ipAddress: string): Promise<any> {
+    // For now, just check by email as requested
+    // Later can add IP-based validation for enhanced security
+    const existingTrial = await this.prisma.trialSession.findFirst({
+      where: {
+        email: email.toLowerCase(),
+        isActive: true,
+        expiresAt: { gt: new Date() }
+      }
+    });
+
+    return existingTrial;
+  }
+
+  /**
+   * Create internal trial session (token never exposed to user)
+   */
+  private async createTrialSession(email: string, ipAddress: string, userAgent: string): Promise<any> {
+    const trialOrg = await this.getOrCreateTrialOrganization();
+
+    // Generate internal JWT (never exposed to user)
+    const trialUserId = `trial_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`; // 10-character random string
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000); // 7 days
+
+    const payload: JwtPayload = {
+      sub: trialUserId,
+      email: email,
+      organizationId: trialOrg.id,
+      organizationSlug: trialOrg.slug,
+      roles: ['trial'],
+      permissions: [
+        'events:read',
+        'events:publish',
+        'channels:subscribe',
+        'connections:create',
+        'analytics:read'
+      ],
+      isTrial: true,
+      trialStartedAt: now,
+      expiresAt: expiresAt
+    };
+
+    const internalToken = this.generateAccessToken(payload);
+
+    // Store session in database
+    try {
+      const session = await this.prisma.trialSession.create({
+        data: {
+          email: email.toLowerCase(),
+          ipAddress,
+          userAgent,
+          organizationId: trialOrg.id,
+          userId: trialUserId,
+          tokenHash: await this.hashToken(internalToken),
+          expiresAt,
+          isActive: true,
+          metadata: {
+            createdAt: now,
+            source: 'invisible_trial'
+          }
+        }
+      });
+
+      return session;
+    } catch (error) {
+      this.logger.error(`Failed to create trial session: ${error.message}`);
+      throw new Error('Failed to create trial session');
+    }
+  }
+
+  private getTrialLimitations(): string[] {
+    return [
+      '7-day trial period',
+      'Limited to 10 channels',
+      'Max 1000 events per day',
+      'Shared trial environment',
+      'Rate limited to 10 requests/minute'
+    ];
+  }
+
+  private getTrialFeatures(): string[] {
+    return [
+      'Real-time event streaming',
+      'WebSocket connections',
+      'Event publishing/subscribing',
+      'Basic analytics',
+      'Multi-channel support'
+    ];
+  }
+
+  /**
+   * Hash token for secure storage
+   */
+  private async hashToken(token: string): Promise<string> {
+    const crypto = require('crypto');
+    return crypto.createHash('sha256').update(token).digest('hex');
+  }
+
+  /**
+   * Generate trial token for immediate access - no registration required
+   * Following market standards from Stripe, SendGrid, Twilio
+   */
+  async generateTrialToken(): Promise<{ token: string; expiresIn: string; trialInfo: any }> {
+    try {
+      // Use a single trial organization for all users
+      const trialOrg = await this.getOrCreateTrialOrganization();
+
+      // Generate unique trial user ID per request
+      const trialUserId = `trial_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
+
+      const now = new Date();
+      const expiresAt = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000); // 7 days
+
+      const payload: JwtPayload = {
+        sub: trialUserId,
+        email: `trial-${Date.now()}@axonpuls.trial`,
+        organizationId: trialOrg.id,
+        organizationSlug: trialOrg.slug,
+        roles: ['trial'],
+        permissions: [
+          'events:read',
+          'events:publish',
+          'channels:subscribe',
+          'connections:create',
+          'analytics:read'
+        ],
+        isTrial: true,
+        trialStartedAt: now,
+        expiresAt: expiresAt
+      };
+
+      const token = this.generateAccessToken(payload);
+
+      this.logger.log(`Trial token generated for user: ${trialUserId}`);
+
+      return {
+        token,
+        expiresIn: '7d',
+        trialInfo: {
+          organizationId: trialOrg.id,
+          organizationSlug: trialOrg.slug,
+          userId: trialUserId,
+          expiresAt: expiresAt.toISOString(),
+          limitations: [
+            '7-day trial period',
+            'Limited to 10 channels',
+            'Max 1000 events per day',
+            'Shared trial environment',
+            'Rate limited to 10 requests/minute'
+          ],
+          features: [
+            'Real-time event streaming',
+            'WebSocket connections',
+            'Event publishing/subscribing',
+            'Basic analytics',
+            'Multi-channel support'
+          ],
+          nextSteps: {
+            register: '/auth/register',
+            docs: 'https://docs.axonstream.ai',
+            examples: 'https://github.com/axonstream/examples'
+          }
+        }
+      };
+    } catch (error) {
+      this.logger.error(`Failed to generate trial token: ${error.message}`);
+      throw new Error('Failed to generate trial token');
+    }
+  }
+
+  /**
+   * Get or create the shared trial organization
+   */
+  async getOrCreateTrialOrganization(): Promise<any> {
+    try {
+      let trialOrg = await this.prisma.organization.findUnique({
+        where: { slug: 'trial' }
+      });
+
+      if (!trialOrg) {
+        trialOrg = await this.prisma.organization.create({
+          data: {
+            name: 'Trial Organization',
+            slug: 'trial',
+            description: 'Shared trial environment for new users to explore AxonStream',
+            settings: {
+              maxChannels: 10,
+              maxEvents: 1000,
+              maxConnections: 5,
+              rateLimit: '10/minute',
+              trialDuration: '7d'
+            }
+          }
+        });
+
+        this.logger.log(`Created trial organization: ${trialOrg.id}`);
+      }
+
+      return trialOrg;
+    } catch (error) {
+      this.logger.error(`Failed to get/create trial organization: ${error.message}`);
+      throw new Error('Failed to setup trial environment');
     }
   }
 }

@@ -3,6 +3,10 @@ import { WsException } from '@nestjs/websockets';
 import { Socket } from 'socket.io';
 import { TenantAwareService, TenantContext } from '../services/tenant-aware.service';
 import { JwtService } from '@nestjs/jwt';
+import { ConfigService } from '@nestjs/config';
+import { TenantJwtService } from '../services/tenant-jwt.service';
+import { TenantRoomService, RoomOptions } from '../services/tenant-room.service';
+import { TenantRateLimitService } from '../services/tenant-rate-limit.service';
 
 export interface TenantSocket extends Socket {
   tenantContext?: TenantContext;
@@ -20,11 +24,15 @@ export class TenantWebSocketGuard implements CanActivate {
   constructor(
     private readonly tenantAwareService: TenantAwareService,
     private readonly jwtService: JwtService,
-  ) {}
+    private readonly configService: ConfigService,
+    private readonly tenantJwtService: TenantJwtService,
+    private readonly tenantRoomService: TenantRoomService,
+    private readonly tenantRateLimitService: TenantRateLimitService,
+  ) { }
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const socket = context.switchToWs().getClient<TenantSocket>();
-    
+
     try {
       // Check if already authenticated
       if (socket.isAuthenticated && socket.tenantContext) {
@@ -52,8 +60,11 @@ export class TenantWebSocketGuard implements CanActivate {
       socket.userId = tenantContext.userId;
       socket.isAuthenticated = true;
 
-      // Join tenant-specific rooms
-      await this.joinTenantRooms(socket, tenantContext);
+      // Join tenant-specific rooms (using shared service)
+      await this.tenantRoomService.joinTenantRooms(socket, tenantContext, {
+        includeFeatures: true,
+        includeRoles: true
+      });
 
       // Log successful authentication
       await this.tenantAwareService.logAuditEvent(
@@ -74,7 +85,7 @@ export class TenantWebSocketGuard implements CanActivate {
 
     } catch (error) {
       this.logger.error(`WebSocket authentication failed: ${error.message}`);
-      
+
       // Log failed authentication attempt
       if (socket.tenantContext) {
         await this.tenantAwareService.logAuditFailure(
@@ -86,12 +97,12 @@ export class TenantWebSocketGuard implements CanActivate {
         );
       }
 
-      socket.emit('error', { 
-        message: 'Authentication failed', 
+      socket.emit('error', {
+        message: 'Authentication failed',
         code: 'AUTH_FAILED',
         timestamp: new Date().toISOString()
       });
-      
+
       socket.disconnect(true);
       return false;
     }
@@ -107,7 +118,7 @@ export class TenantWebSocketGuard implements CanActivate {
     // Try query parameters
     const organizationId = socket.handshake.query?.organizationId as string;
     const userId = socket.handshake.query?.userId as string;
-    
+
     if (organizationId) {
       return await this.tenantAwareService.createTenantContext(organizationId, userId);
     }
@@ -118,7 +129,7 @@ export class TenantWebSocketGuard implements CanActivate {
   private async authenticateWithJWT(token: string): Promise<TenantContext | null> {
     try {
       const payload = await this.jwtService.verifyAsync(token);
-      
+
       return await this.tenantAwareService.createTenantContext(
         payload.organizationId,
         payload.sub,
@@ -147,7 +158,7 @@ export class TenantWebSocketGuard implements CanActivate {
   private async validateExistingContext(socket: TenantSocket): Promise<boolean> {
     try {
       await this.tenantAwareService.validateTenantContext(socket.tenantContext);
-      await this.checkRateLimits(socket, socket.tenantContext);
+      await this.tenantRateLimitService.checkSocketRateLimit(socket, socket.tenantContext);
       return true;
     } catch (error) {
       this.logger.warn(`Existing context validation failed: ${error.message}`);
@@ -199,29 +210,7 @@ export class TenantWebSocketGuard implements CanActivate {
     }
   }
 
-  private async joinTenantRooms(socket: TenantSocket, context: TenantContext): Promise<void> {
-    // Join organization room
-    socket.join(`org:${context.organizationId}`);
-
-    // Join user room if user is specified
-    if (context.userId) {
-      socket.join(`user:${context.userId}`);
-    }
-
-    // Join role-based rooms
-    if (context.roles && context.roles.length > 0) {
-      for (const role of context.roles) {
-        socket.join(`role:${context.organizationId}:${role}`);
-      }
-    }
-
-    // Join feature-based rooms
-    if (context.features && context.features.length > 0) {
-      for (const feature of context.features) {
-        socket.join(`feature:${context.organizationId}:${feature}`);
-      }
-    }
-  }
+  // Room management now handled by TenantRoomService
 }
 
 /**
@@ -249,8 +238,7 @@ export function ValidateWebSocketMessage() {
 
       // Check rate limits
       try {
-        const guard = new TenantWebSocketGuard(null, null);
-        await guard['checkRateLimits'](socket, socket.tenantContext);
+        await this.tenantRateLimitService.checkWebSocketRateLimit(socket, socket.tenantContext);
       } catch (error) {
         socket.emit('error', { message: 'Rate limit exceeded', code: 'RATE_LIMIT' });
         return;

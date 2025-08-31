@@ -1,34 +1,34 @@
-# AxonPuls CLI
+# axonstream CLI
 
-Command-line interface for managing the AxonPuls real-time platform. Test connections, publish events, subscribe to channels, and monitor your platform.
+Command-line interface for managing the axonstream real-time platform. Test connections, publish events, subscribe to channels, and monitor your platform.
 
 ## Installation
 
 ```bash
-npm install -g @AxonPuls/cli
+npm install -g @axonstream/cli
 ```
 
 ## Quick Start
 
 1. **Configure your connection:**
 ```bash
-AxonPuls config set gateway_url wss://api.AxonPuls.dev
-AxonPuls config set token your-jwt-token
+axonstream config set gateway_url wss://api.axonstream.ai
+axonstream config set token your-jwt-token
 ```
 
 2. **Test connection:**
 ```bash
-AxonPuls connect
+axonstream connect
 ```
 
 3. **Publish an event:**
 ```bash
-AxonPuls publish org:myorg:notifications user.created '{"userId": "123", "email": "user@example.com"}'
+axonstream publish org:myorg:notifications user.created '{"userId": "123", "email": "user@example.com"}'
 ```
 
 4. **Subscribe to events:**
 ```bash
-AxonPuls subscribe org:myorg:notifications
+axonstream subscribe org:myorg:notifications
 ```
 
 ## Commands
@@ -36,8 +36,8 @@ AxonPuls subscribe org:myorg:notifications
 ### Connection Management
 
 ```bash
-# Test connection to AxonPuls gateway
-AxonPuls connect [options]
+# Test connection to axonstream gateway
+axonstream connect [options]
 
 Options:
   -u, --url <url>       Gateway WebSocket URL
@@ -49,7 +49,7 @@ Options:
 
 ```bash
 # Publish event to channel
-AxonPuls publish <channel> <type> [payload] [options]
+axonstream publish <channel> <type> [payload] [options]
 
 Arguments:
   channel               Channel name (e.g., org:myorg:notifications)
@@ -66,23 +66,23 @@ Options:
 Examples:
 ```bash
 # Simple event
-AxonPuls publish org:myorg:alerts system.error '{"code": 500, "message": "Internal error"}'
+axonstream publish org:myorg:alerts system.error '{"code": 500, "message": "Internal error"}'
 
 # From file
-AxonPuls publish org:myorg:orders order.created --file order-payload.json
+axonstream publish org:myorg:orders order.created --file order-payload.json
 
 # Interactive mode
-AxonPuls publish org:myorg:users user.updated --interactive
+axonstream publish org:myorg:users user.updated --interactive
 
 # With delivery guarantee
-AxonPuls publish org:myorg:payments payment.processed '{"amount": 100}' --delivery at_least_once
+axonstream publish org:myorg:payments payment.processed '{"amount": 100}' --delivery at_least_once
 ```
 
 ### Event Subscription
 
 ```bash
 # Subscribe to channels and listen for events
-AxonPuls subscribe <channels...> [options]
+axonstream subscribe <channels...> [options]
 
 Arguments:
   channels              Channel names to subscribe to
@@ -98,26 +98,26 @@ Options:
 Examples:
 ```bash
 # Subscribe to single channel
-AxonPuls subscribe org:myorg:notifications
+axonstream subscribe org:myorg:notifications
 
 # Subscribe to multiple channels
-AxonPuls subscribe org:myorg:orders org:myorg:payments
+axonstream subscribe org:myorg:orders org:myorg:payments
 
 # With replay
-AxonPuls subscribe org:myorg:orders --replay-count 50
+axonstream subscribe org:myorg:orders --replay-count 50
 
 # Table output
-AxonPuls subscribe org:myorg:users --output table
+axonstream subscribe org:myorg:users --output table
 
 # Save to file
-AxonPuls subscribe org:myorg:logs --save events.jsonl
+axonstream subscribe org:myorg:logs --save events.jsonl
 ```
 
 ### Event Replay
 
 ```bash
 # Replay historical events from channel
-AxonPuls replay <channel> [options]
+axonstream replay <channel> [options]
 
 Arguments:
   channel               Channel name
@@ -133,7 +133,7 @@ Options:
 
 ```bash
 # Monitor platform health and metrics
-AxonPuls monitor [options]
+axonstream monitor [options]
 
 Options:
   -i, --interval <seconds>   Refresh interval (default: 5)
@@ -145,32 +145,32 @@ Options:
 
 ```bash
 # Show authentication status
-AxonPuls auth status
+axonstream auth status
 
 # Validate token
-AxonPuls auth token --validate
+axonstream auth token --validate
 
 # Decode token information
-AxonPuls auth token --decode
+axonstream auth token --decode
 
 # Logout (clear stored token)
-AxonPuls auth logout
+axonstream auth logout
 ```
 
 ### Configuration
 
 ```bash
 # List all configuration
-AxonPuls config list
+axonstream config list
 
 # Set configuration value
-AxonPuls config set <key> <value>
+axonstream config set <key> <value>
 
 # Get configuration value
-AxonPuls config get <key>
+axonstream config get <key>
 
 # Reset to defaults
-AxonPuls config reset
+axonstream config reset
 ```
 
 Configuration keys:
@@ -186,13 +186,13 @@ Configuration keys:
 
 ```bash
 # Test WebSocket connection
-AxonPuls test connection
+axonstream test connection
 
 # Measure round-trip latency
-AxonPuls test latency --count 10
+axonstream test latency --count 10
 
 # Test event throughput
-AxonPuls test throughput --events 1000 --concurrent 5
+axonstream test throughput --events 1000 --concurrent 5
 ```
 
 ## Environment Variables
@@ -200,21 +200,21 @@ AxonPuls test throughput --events 1000 --concurrent 5
 You can also use environment variables instead of configuration:
 
 ```bash
-export AxonPuls_GATEWAY_URL=wss://api.AxonPuls.dev
-export AxonPuls_TOKEN=your-jwt-token
-export AxonPuls_ORG_ID=your-org-id
+export axonstream_GATEWAY_URL=wss://api.axonstream.ai
+export axonstream_TOKEN=your-jwt-token
+export axonstream_ORG_ID=your-org-id
 ```
 
 ## Multi-Tenant Usage
 
-AxonPuls enforces strict tenant isolation. All channels must include your organization prefix:
+axonstream enforces strict tenant isolation. All channels must include your organization prefix:
 
 ```bash
 # ✅ Correct - includes org prefix
-AxonPuls subscribe org:your-org-id:notifications
+axonstream subscribe org:your-org-id:notifications
 
 # ❌ Incorrect - will be rejected
-AxonPuls subscribe global-notifications
+axonstream subscribe global-notifications
 ```
 
 ## Output Formats
@@ -265,10 +265,10 @@ The CLI provides detailed error messages for common issues:
 ### Real-time Order Processing
 ```bash
 # Terminal 1: Subscribe to orders
-AxonPuls subscribe org:ecommerce:orders --output table
+axonstream subscribe org:ecommerce:orders --output table
 
 # Terminal 2: Publish new order
-AxonPuls publish org:ecommerce:orders order.created '{
+axonstream publish org:ecommerce:orders order.created '{
   "orderId": "order-123",
   "customerId": "customer-456",
   "items": [{"sku": "WIDGET-1", "quantity": 2}],
@@ -279,27 +279,27 @@ AxonPuls publish org:ecommerce:orders order.created '{
 ### System Monitoring
 ```bash
 # Monitor platform health
-AxonPuls monitor --dashboard
+axonstream monitor --dashboard
 
 # Subscribe to error events
-AxonPuls subscribe org:myorg:errors --filter "severity=critical"
+axonstream subscribe org:myorg:errors --filter "severity=critical"
 ```
 
 ### Development & Testing
 ```bash
 # Test connection
-AxonPuls connect --verbose
+axonstream connect --verbose
 
 # Measure latency
-AxonPuls test latency --count 100
+axonstream test latency --count 100
 
 # Load test
-AxonPuls test throughput --events 10000 --size 1024
+axonstream test throughput --events 10000 --size 1024
 ```
 
 ## Global Options
 
-- `-c, --config <path>` - Configuration file path (default: ~/.AxonPulsrc)
+- `-c, --config <path>` - Configuration file path (default: ~/.axonstreamrc)
 - `-v, --verbose` - Enable verbose logging  
 - `--no-color` - Disable colored output
 

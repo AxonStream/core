@@ -1,91 +1,86 @@
 {
   "name": "@axonstream/core",
   "version": "2.0.0",
+  "description": "🚀 Game-Changing Real-Time Collaboration Platform - The most advanced real-time messaging SDK with Magic collaboration, self-healing, and universal framework support",
+  "keywords": [
+    "real-time",
+    "collaboration",
+    "websocket",
+    "operational-transform",
+    "time-travel",
+    "presence",
+    "multi-tenant",
+    "rbac",
+    "self-healing",
+    "auto-reconnect",
+    "event-streaming",
+    "redis-streams",
+    "framework-agnostic",
+    "universal-sdk"
+  ],
+  "author": "AxonStreamAI <info@axonstream.ai>",
   "license": "MIT",
-  "type": "module",
-  "main": "dist/index.cjs",
-  "module": "dist/index.js",
+  "homepage": "https://axonstream.ai",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/axonstream/axonpuls-platform.git"
+  },
+  "bugs": {
+    "url": "https://github.com/axonstream/axonpuls-platform/issues"
+  },
+  "main": "dist/index.js",
+  "module": "dist/index.mjs",
   "types": "dist/index.d.ts",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "import": "./dist/index.js",
-      "require": "./dist/index.cjs"
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
     },
-    "./adapters/vue": {
-      "types": "./dist/adapters/vue.d.ts",
-      "import": "./dist/adapters/vue.js",
-      "require": "./dist/adapters/vue.cjs"
-    },
-    "./adapters/angular": {
-      "types": "./dist/adapters/angular.d.ts",
-      "import": "./dist/adapters/angular.js",
-      "require": "./dist/adapters/angular.cjs"
-    },
-    "./adapters/react": {
-      "types": "./dist/adapters/react.d.ts",
-      "import": "./dist/adapters/react.js",
-      "require": "./dist/adapters/react.cjs"
-    },
-    "./ui": {
-      "types": "./dist/ui/index.d.ts",
-      "import": "./dist/ui/index.js",
-      "require": "./dist/ui/index.cjs"
-    },
-    "./embed": {
-      "types": "./dist/embed/index.d.ts",
-      "import": "./dist/embed/index.js",
-      "require": "./dist/embed/index.cjs"
-    },
-    "./package.json": "./package.json"
+    "./cdn": "./dist/cdn.min.js"
   },
   "files": [
-    "dist",
+    "dist/**/*",
     "README.md",
     "LICENSE"
   ],
-  "sideEffects": false,
-  "engines": {
-    "node": ">=20"
-  },
-  "peerDependencies": {
-    "vue": "^3",
-    "@angular/core": "^17 || ^18",
-    "@angular/common": "^17 || ^18",
-    "rxjs": "^7 || ^8"
-  },
   "scripts": {
-    "build": "tsup",
-    "dev": "tsup --watch",
-    "lint": "eslint 'src/**/*.{ts,tsx}'",
-    "typecheck": "tsc --noEmit",
-    "test:local": "npm run build && node test-sdk-local.mjs"
+    "build": "tsup src/index.ts src/react.ts src/vue.ts src/angular.ts src/svelte.ts src/magic.ts src/presence.ts src/webhooks.ts --format esm,cjs --dts --target es2020 --minify",
+    "build:cdn": "tsup src/cdn.ts --format iife --minify --dts --target es2020",
+    "dev": "tsup src/index.ts --format esm,cjs --watch --dts",
+    "type-check": "tsc --noEmit",
+    "lint": "eslint 'src/**/*.ts'",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "prepublishOnly": "npm run build && npm run build:cdn"
   },
   "dependencies": {
-    "axios": "^1.7.9",
-    "jwt-decode": "^4.0.0",
-    "socket.io-client": "^4.8.1",
-    "zod": "^3.23.8"
+    "socket.io-client": "^4.7.4",
+    "redis": "^4.6.12",
+    "zod": "^3.22.4",
+    "uuid": "^9.0.1",
+    "eventemitter2": "^6.4.9"
+  },
+  "peerDependencies": {
+    "react": ">=16.8.0",
+    "vue": ">=3.0.0"
   },
   "devDependencies": {
-    "tsup": "^8.3.0",
-    "typescript": "^5.9.2"
+    "@types/react": "^18.2.45",
+    "@types/uuid": "^9.0.7",
+    "@typescript-eslint/eslint-plugin": "^6.13.2",
+    "@typescript-eslint/parser": "^6.13.2",
+    "eslint": "^8.55.0",
+    "jest": "^29.7.0",
+    "tsup": "^8.0.1",
+    "typescript": "^5.3.3"
   },
-  "peerDependenciesMeta": {
-    "vue": {
-      "optional": true
-    },
-    "@angular/core": {
-      "optional": true
-    },
-    "@angular/common": {
-      "optional": true
-    },
-    "rxjs": {
-      "optional": true
-    }
+  "engines": {
+    "node": ">=16.0.0"
   },
-  "publishConfig": {
-    "access": "public"
-  }
+  "browserslist": [
+    "> 1%",
+    "last 2 versions",
+    "not dead"
+  ]
 }

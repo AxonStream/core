@@ -11,6 +11,7 @@
 
 import { AxonUIComponent, type ComponentConfig, createElement, formatTimestamp, sanitizeHtml } from '../base';
 import type { AxonPulsEvent, AxonPulsClient } from '../../core/client';
+import { getChatConfig } from '../../config/ui-config';
 
 export interface ChatConfig extends ComponentConfig {
     channel: string;
@@ -33,12 +34,13 @@ export class AxonChat extends AxonUIComponent {
 
     constructor(config: ChatConfig) {
         super(config);
+        const chatDefaults = getChatConfig();
         this.config = {
-            placeholder: 'Type a message...',
-            showTimestamps: true,
-            showTypes: false,
-            maxMessages: 100,
-            enableInput: true,
+            placeholder: chatDefaults.placeholder,
+            showTimestamps: chatDefaults.showTimestamps,
+            showTypes: chatDefaults.showTypes,
+            maxMessages: chatDefaults.maxMessages,
+            enableInput: chatDefaults.enableInput,
             ...config
         };
         this.setupEventHandlers();

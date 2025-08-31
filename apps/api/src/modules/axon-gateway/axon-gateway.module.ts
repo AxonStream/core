@@ -11,14 +11,30 @@ import { MagicModule } from '../magic/magic.module';
     ConfigModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
-      useFactory: async (configService: ConfigService) => ({
-        secret: configService.get<string>('auth.jwt.secret'),
-        signOptions: {
-          expiresIn: configService.get<string>('auth.jwt.expiresIn'),
-          issuer: configService.get<string>('auth.jwt.issuer'),
-          audience: configService.get<string>('auth.jwt.audience'),
-        },
-      }),
+      useFactory: async (configService: ConfigService) => {
+        const algorithm = configService.get<string>('auth.jwt.algorithm');
+        const privateKey = configService.get<string>('auth.jwt.privateKey');
+        const secret = configService.get<string>('auth.jwt.secret');
+
+        // Configure based on algorithm
+        const config: any = {
+          signOptions: {
+            expiresIn: configService.get<string>('auth.jwt.expiresIn'),
+            issuer: configService.get<string>('auth.jwt.issuer'),
+            audience: configService.get<string>('auth.jwt.audience'),
+            algorithm: algorithm || 'HS256',
+          },
+        };
+
+        if (algorithm === 'RS256' && privateKey) {
+          config.privateKey = privateKey;
+          config.publicKey = configService.get<string>('auth.jwt.publicKey');
+        } else {
+          config.secret = secret;
+        }
+
+        return config;
+      },
       inject: [ConfigService],
     }),
     AuthModule,

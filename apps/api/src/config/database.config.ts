@@ -1,18 +1,40 @@
 import { registerAs } from '@nestjs/config';
+import {
+  validateProductionSecrets,
+  safeParseInt,
+  safeParseBool,
+  isProduction,
+  isDevelopment,
+  logConfigurationSummary,
+} from './config.utils';
 
-export const databaseConfig = registerAs('database', () => ({
-  url: process.env.DATABASE_URL || 'postgresql://postgres:password@localhost:5432/AxonPuls_db',
-  host: process.env.DB_HOST || 'localhost',
-  port: parseInt(process.env.DB_PORT || '5432'),
-  username: process.env.DB_USERNAME || 'postgres',
-  password: process.env.DB_PASSWORD || 'password',
-  database: process.env.DB_NAME || 'AxonPuls_db',
-  ssl: process.env.DB_SSL === 'true',
-  logging: process.env.NODE_ENV === 'development',
-  synchronize: process.env.NODE_ENV === 'development',
-  maxConnections: parseInt(process.env.DB_MAX_CONNECTIONS || '100'),
-  acquireTimeout: parseInt(process.env.DB_ACQUIRE_TIMEOUT || '60000'),
-  timeout: parseInt(process.env.DB_TIMEOUT || '60000'),
-  retryAttempts: parseInt(process.env.DB_RETRY_ATTEMPTS || '3'),
-  retryDelay: parseInt(process.env.DB_RETRY_DELAY || '3000'),
-}));
+export const databaseConfig = registerAs('database', () => {
+  // Validate required production secrets
+  validateProductionSecrets({
+    DATABASE_URL: process.env.DATABASE_URL,
+  });
+
+  const config = {
+    // NO FALLBACK DATABASE URL - fail if missing in production
+    url: process.env.DATABASE_URL || (isDevelopment() ? 'postgresql://postgres:password@localhost:5432/AxonPuls_db' : undefined),
+    host: process.env.DB_HOST || (isDevelopment() ? 'localhost' : undefined),
+    port: safeParseInt(process.env.DB_PORT, 5432, { required: false }),
+    // NO FALLBACK CREDENTIALS - fail if missing in production
+    username: process.env.DB_USERNAME || (isDevelopment() ? 'postgres' : undefined),
+    password: process.env.DB_PASSWORD || (isDevelopment() ? 'password' : undefined),
+    database: process.env.DB_NAME || (isDevelopment() ? 'AxonPuls_db' : undefined),
+    ssl: safeParseBool(process.env.DB_SSL, isProduction(), { required: false }),
+    logging: isDevelopment(),
+    synchronize: isDevelopment(),
+    maxConnections: safeParseInt(process.env.DB_MAX_CONNECTIONS, 100, { required: false }),
+    acquireTimeout: safeParseInt(process.env.DB_ACQUIRE_TIMEOUT, 60000, { required: false }),
+    timeout: safeParseInt(process.env.DB_TIMEOUT, 60000, { required: false }),
+    retryAttempts: safeParseInt(process.env.DB_RETRY_ATTEMPTS, 3, { required: false }),
+    retryDelay: safeParseInt(process.env.DB_RETRY_DELAY, 3000, { required: false }),
+  };
+
+  // Log configuration summary (with sensitive data redacted)
+  logConfigurationSummary('Database', config);
+
+  return config;
+});

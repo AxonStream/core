@@ -2,6 +2,8 @@ import { Injectable, NestMiddleware, ForbiddenException, UnauthorizedException, 
 import { Request, Response, NextFunction } from 'express';
 import { JwtService } from '@nestjs/jwt';
 import { TenantAwareService, TenantContext } from '../services/tenant-aware.service';
+import { TenantJwtService } from '../services/tenant-jwt.service';
+import { TenantRateLimitService } from '../services/tenant-rate-limit.service';
 import { Logger } from '@nestjs/common';
 
 export interface TenantRequest extends Request {
@@ -17,17 +19,19 @@ export class TenantIsolationMiddleware implements NestMiddleware {
   constructor(
     protected readonly jwtService: JwtService,
     protected readonly tenantAwareService: TenantAwareService,
-  ) {}
+    protected readonly tenantJwtService: TenantJwtService,
+    protected readonly tenantRateLimitService: TenantRateLimitService,
+  ) { }
 
   async use(req: TenantRequest, res: Response, next: NextFunction) {
     try {
       // Extract tenant context from request
       const tenantContext = await this.extractTenantContext(req);
-      
+
       if (tenantContext) {
         // Validate tenant context
         await this.tenantAwareService.validateTenantContext(tenantContext);
-        
+
         // Attach to request
         req.tenantContext = tenantContext;
         req.organizationId = tenantContext.organizationId;
@@ -36,8 +40,8 @@ export class TenantIsolationMiddleware implements NestMiddleware {
         // Increment API call count for rate limiting
         await this.tenantAwareService.incrementApiCallCount(tenantContext.organizationId);
 
-        // Check resource limits
-        await this.checkApiRateLimits(tenantContext);
+        // Check resource limits (using shared service)
+        await this.tenantRateLimitService.checkHttpRateLimit(tenantContext);
 
         this.logger.debug(`Tenant context established for org: ${tenantContext.organizationId}`);
       }
@@ -45,20 +49,23 @@ export class TenantIsolationMiddleware implements NestMiddleware {
       next();
     } catch (error) {
       this.logger.error(`Tenant isolation middleware error: ${error.message}`);
-      
+
       if (error instanceof ForbiddenException || error instanceof UnauthorizedException) {
         throw error;
       }
-      
+
       throw new ForbiddenException('Tenant access denied');
     }
   }
 
   private async extractTenantContext(req: TenantRequest): Promise<TenantContext | null> {
-    // Method 1: Extract from JWT token
-    const tokenContext = await this.extractFromJWT(req);
-    if (tokenContext) {
-      return tokenContext;
+    // Method 1: Extract from JWT token (using shared service)
+    const authHeader = req.headers.authorization;
+    if (authHeader) {
+      const tokenContext = await this.tenantJwtService.extractFromAuthHeader(authHeader);
+      if (tokenContext) {
+        return tokenContext;
+      }
     }
 
     // Method 2: Extract from headers
@@ -76,30 +83,7 @@ export class TenantIsolationMiddleware implements NestMiddleware {
     return null;
   }
 
-  private async extractFromJWT(req: TenantRequest): Promise<TenantContext | null> {
-    try {
-      const authHeader = req.headers.authorization;
-      if (!authHeader || !authHeader.startsWith('Bearer ')) {
-        return null;
-      }
-
-      const token = authHeader.substring(7);
-      const payload = this.jwtService.verify(token);
-
-      if (payload.organizationId && payload.sub) {
-        return await this.tenantAwareService.createTenantContext(
-          payload.organizationId,
-          payload.sub,
-          payload.permissions
-        );
-      }
-
-      return null;
-    } catch (error) {
-      this.logger.debug(`JWT extraction failed: ${error.message}`);
-      return null;
-    }
-  }
+  // JWT extraction now handled by TenantJwtService
 
   private extractFromHeaders(req: TenantRequest): TenantContext | null {
     const organizationId = req.headers['x-organization-id'] as string;
@@ -175,11 +159,11 @@ export class TenantIsolationMiddleware implements NestMiddleware {
 export class TenantIsolationGuard implements CanActivate {
   protected readonly logger = new Logger(TenantIsolationGuard.name);
 
-  constructor(protected readonly tenantAwareService: TenantAwareService) {}
+  constructor(protected readonly tenantAwareService: TenantAwareService) { }
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<TenantRequest>();
-    
+
     if (!request.tenantContext) {
       this.logger.warn('No tenant context found in request');
       return false;
@@ -234,7 +218,7 @@ export class TenantFeatureGuard implements CanActivate {
   constructor(
     protected readonly tenantAwareService: TenantAwareService,
     protected readonly requiredFeature: string,
-  ) {}
+  ) { }
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<TenantRequest>();
@@ -261,7 +245,7 @@ export function RequireFeature(feature: string) {
   class DynamicFeatureGuard implements CanActivate {
     public readonly logger = new Logger('DynamicFeatureGuard');
 
-    constructor(public readonly tenantAwareService: TenantAwareService) {}
+    constructor(public readonly tenantAwareService: TenantAwareService) { }
 
     async canActivate(context: ExecutionContext): Promise<boolean> {
       const request = context.switchToHttp().getRequest<TenantRequest>();
@@ -293,7 +277,7 @@ export class TenantResourceLimitGuard implements CanActivate {
   constructor(
     protected readonly tenantAwareService: TenantAwareService,
     protected readonly resourceType: string,
-  ) {}
+  ) { }
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<TenantRequest>();
@@ -320,7 +304,7 @@ export function RequireResourceLimit(resourceType: string) {
   class DynamicResourceLimitGuard implements CanActivate {
     public readonly logger = new Logger('DynamicResourceLimitGuard');
 
-    constructor(public readonly tenantAwareService: TenantAwareService) {}
+    constructor(public readonly tenantAwareService: TenantAwareService) { }
 
     async canActivate(context: ExecutionContext): Promise<boolean> {
       const request = context.switchToHttp().getRequest<TenantRequest>();

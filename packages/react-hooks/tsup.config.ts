@@ -2,17 +2,17 @@
 import { defineConfig } from 'tsup'
 
 export default defineConfig({
-  entry: { index: 'src/index.ts' },   // stable file name
+  entry: ['src/index.ts'],
   outDir: 'dist',
   format: ['esm', 'cjs'],
-  dts: true,                          // emit .d.ts for consumers
+  dts: true,
   target: 'es2022',
   platform: 'neutral',
-  splitting: false,                   // avoid hashed chunk names
-  sourcemap: false,                   // keep tarball slim
+  splitting: false,
+  sourcemap: false,
   minify: true,
   treeshake: true,
   clean: true,
-  external: ['react', 'react-dom', '@axonstream/core'],
+  external: ['react', 'react-dom', '@axonstream/core', 'socket.io-client', 'ws', 'crypto', 'fs', 'http', 'https', 'net', 'tls', 'url', 'stream', 'zlib', 'child_process'],
   tsconfig: './tsconfig.json'
 })

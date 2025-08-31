@@ -20,6 +20,10 @@ export interface ChannelState {
   messageCount: number;
   sendMessage: (type: string, payload: any) => void;
   clearMessages: () => void;
+  // 🎯 PRODUCTION-GRADE HTTP API INTEGRATION
+  loadHistory: (options?: { count?: number; startTime?: string; endTime?: string }) => Promise<void>;
+  isLoadingHistory: boolean;
+  historyError: string | null;
 }
 
 /**
@@ -62,6 +66,8 @@ export function useAxonpulsChannel(
   const [messages, setMessages] = useState<ChannelMessage[]>([]);
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [lastMessage, setLastMessage] = useState<ChannelMessage | null>(null);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+  const [historyError, setHistoryError] = useState<string | null>(null);
   const messageHandlerRef = useRef<((data: any) => void) | null>(null);
 
   const sendMessage = useCallback((type: string, payload: any) => {
@@ -90,6 +96,61 @@ export function useAxonpulsChannel(
     setLastMessage(null);
   }, []);
 
+  // 🎯 PRODUCTION-GRADE HISTORY LOADING via HTTP API
+  const loadHistory = useCallback(async (options: { count?: number; startTime?: string; endTime?: string } = {}) => {
+    if (!connection.client) {
+      setHistoryError('No connection available');
+      return;
+    }
+
+    setIsLoadingHistory(true);
+    setHistoryError(null);
+
+    try {
+      // Use the SDK's HTTP API method
+      const result = await (connection.client as any).replayChannel(channelName, options);
+
+      if (result.success && result.events) {
+        // Convert backend events to ChannelMessage format
+        const historyMessages: ChannelMessage[] = result.events.map((event: any) => ({
+          id: event.id,
+          type: event.type,
+          payload: event.payload,
+          metadata: {
+            timestamp: new Date(event.timestamp).toISOString(),
+            userId: event.metadata?.userId,
+            organizationId: event.metadata?.org_id || event.metadata?.organizationId,
+            channel: channelName
+          }
+        }));
+
+        // Prepend history to current messages (history first, then live messages)
+        setMessages(prev => {
+          const combined = [...historyMessages, ...prev];
+          // Remove duplicates by ID
+          const unique = combined.filter((msg, index, arr) =>
+            arr.findIndex(m => m.id === msg.id) === index
+          );
+          // Keep only maxMessages
+          return unique.slice(-maxMessages);
+        });
+
+        if (debug) {
+          console.log(`📜 Loaded ${historyMessages.length} historical messages for ${channelName}`);
+        }
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to load history';
+      setHistoryError(errorMessage);
+
+      if (debug) {
+        console.error(`❌ Failed to load history for ${channelName}:`, error);
+      }
+    } finally {
+      setIsLoadingHistory(false);
+    }
+  }, [channelName, connection.client, maxMessages, debug]);
+
   // Set up message listener
   useEffect(() => {
     if (!connection.client || !connection.isConnected) return;
@@ -115,7 +176,7 @@ export function useAxonpulsChannel(
 
     return () => {
       if (connection.client && messageHandlerRef.current) {
-          connection.client.off('channel_message', messageHandlerRef.current);
+        connection.client.off('channel_message', messageHandlerRef.current);
       }
     };
   }, [connection.client, connection.isConnected, channelName, maxMessages, debug]);
@@ -150,5 +211,8 @@ export function useAxonpulsChannel(
     messageCount: messages.length,
     sendMessage,
     clearMessages,
+    loadHistory,
+    isLoadingHistory,
+    historyError,
   };
 }

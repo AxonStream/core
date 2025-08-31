@@ -77,14 +77,14 @@ class CircuitBreaker:
 class AxonPulsClient:
     """Advanced AxonPuls client with multi-tenancy, circuit breaker, and comprehensive error handling"""
     
-    # Constants
-    MAX_PAYLOAD_BYTES = 1048576  # 1MB
-    MAX_CHANNELS = 200
-    HEARTBEAT_INTERVAL = 30
-    BACKOFF_BASE_MS = 250
-    BACKOFF_FACTOR = 2
-    BACKOFF_MAX_MS = 30000
-    BACKOFF_JITTER = 0.2
+    # Production-grade configurable constants with environment variable support
+    MAX_PAYLOAD_BYTES = int(os.getenv('AXON_MAX_PAYLOAD_BYTES', '1048576'))  # 1MB default
+    MAX_CHANNELS = int(os.getenv('AXON_MAX_CHANNELS', '200'))
+    HEARTBEAT_INTERVAL = int(os.getenv('AXON_HEARTBEAT_INTERVAL', '30'))
+    BACKOFF_BASE_MS = int(os.getenv('AXON_BACKOFF_BASE_MS', '250'))
+    BACKOFF_FACTOR = float(os.getenv('AXON_BACKOFF_FACTOR', '2'))
+    BACKOFF_MAX_MS = int(os.getenv('AXON_BACKOFF_MAX_MS', '30000'))
+    BACKOFF_JITTER = float(os.getenv('AXON_BACKOFF_JITTER', '0.2'))
     
     def __init__(self, config: AxonPulsClientConfig):
         self.config = config

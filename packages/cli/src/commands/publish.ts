@@ -107,7 +107,8 @@ export async function publishCommand(channel: string, type: string, payload?: st
         console.log(`  Channel: ${chalk.cyan(channel)}`);
         console.log(`  Type: ${chalk.cyan(type)}`);
         console.log(`  Size: ${chalk.cyan(formatBytes(payloadSize))}`);
-        console.log(`  Organization: ${chalk.cyan(tokenInfo.payload.organizationId)}`);
+        const organizationId = tokenInfo.payload?.organizationId || tokenInfo.payload?.orgId;
+        console.log(`  Organization: ${chalk.cyan(organizationId)}`);
 
         if (options.delivery) {
           console.log(`  Delivery guarantee: ${chalk.cyan(options.delivery)}`);

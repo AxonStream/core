@@ -23,6 +23,12 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   }
 
   async validate(payload: JwtPayload) {
+    // Handle trial tokens - no user lookup required
+    if (payload.isTrial) {
+      return this.validateTrialToken(payload);
+    }
+
+    // Existing validation for real users
     const user = await this.authService.getUserById(payload.sub);
 
     if (!user) {
@@ -46,6 +52,33 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       roles: payload.roles || [],
       permissions: payload.permissions || [],
       user,
+    };
+  }
+
+  /**
+   * Validate trial tokens - separate validation logic
+   */
+  private validateTrialToken(payload: JwtPayload) {
+    // Check if trial expired
+    if (payload.expiresAt && new Date() > new Date(payload.expiresAt)) {
+      throw new UnauthorizedException('Trial period expired. Please register for full access at /auth/register');
+    }
+
+    // Validate trial token structure
+    if (!payload.sub?.startsWith('trial_') || !payload.organizationSlug || payload.organizationSlug !== 'trial') {
+      throw new UnauthorizedException('Invalid trial token');
+    }
+
+    return {
+      userId: payload.sub,
+      email: payload.email,
+      organizationId: payload.organizationId,
+      organizationSlug: payload.organizationSlug,
+      roles: payload.roles || ['trial'],
+      permissions: payload.permissions || [],
+      isTrial: true,
+      trialExpiresAt: payload.expiresAt,
+      user: null // No real user for trial tokens
     };
   }
 }

@@ -6,8 +6,11 @@ import type { RedisClientType } from 'redis';
 export class RedisService {
   private readonly logger = new Logger(RedisService.name);
   private static client: RedisClientType;
+  private static pubSubClient: RedisClientType;
   private static isConnected = false;
+  private static isPubSubConnected = false;
   private static connectionPromise: Promise<void> | null = null;
+  private static pubSubConnectionPromise: Promise<void> | null = null;
 
   constructor() {
     if (!RedisService.client) {
@@ -29,30 +32,63 @@ export class RedisService {
         RedisService.isConnected = false;
       });
     }
+
+    if (!RedisService.pubSubClient) {
+      RedisService.pubSubClient = createClient({
+        url: process.env.REDIS_URL || 'redis://localhost:6379',
+      });
+
+      RedisService.pubSubClient.on('error', (err) => {
+        this.logger.error('Redis PubSub Client Error', err);
+      });
+
+      RedisService.pubSubClient.on('connect', () => {
+        this.logger.log('Redis PubSub Client Connected');
+        RedisService.isPubSubConnected = true;
+      });
+
+      RedisService.pubSubClient.on('disconnect', () => {
+        this.logger.warn('Redis PubSub Client Disconnected');
+        RedisService.isPubSubConnected = false;
+      });
+    }
   }
 
   get client(): RedisClientType {
     return RedisService.client;
   }
 
+  get pubSubClient(): RedisClientType {
+    return RedisService.pubSubClient;
+  }
+
   get isConnected(): boolean {
     return RedisService.isConnected;
   }
 
+  get isPubSubConnected(): boolean {
+    return RedisService.isPubSubConnected;
+  }
+
   async onModuleInit() {
+    // Connect both clients
+    await Promise.all([
+      this.connectToRedis(),
+      this.connectToPubSubRedis()
+    ]);
+  }
+
+  private async connectToRedis(): Promise<void> {
     if (RedisService.connectionPromise) {
-      // Another instance is already connecting, wait for it
       await RedisService.connectionPromise;
       return;
     }
 
     if (RedisService.isConnected) {
-      // Already connected
       return;
     }
 
-    // Create a promise to ensure only one connection attempt happens
-    RedisService.connectionPromise = this.connectToRedis();
+    RedisService.connectionPromise = this._connectToRedis();
 
     try {
       await RedisService.connectionPromise;
@@ -61,7 +97,26 @@ export class RedisService {
     }
   }
 
-  private async connectToRedis(): Promise<void> {
+  private async connectToPubSubRedis(): Promise<void> {
+    if (RedisService.pubSubConnectionPromise) {
+      await RedisService.pubSubConnectionPromise;
+      return;
+    }
+
+    if (RedisService.isPubSubConnected) {
+      return;
+    }
+
+    RedisService.pubSubConnectionPromise = this._connectToPubSubRedis();
+
+    try {
+      await RedisService.pubSubConnectionPromise;
+    } finally {
+      RedisService.pubSubConnectionPromise = null;
+    }
+  }
+
+  private async _connectToRedis(): Promise<void> {
     try {
       await RedisService.client.connect();
     } catch (error: any) {
@@ -75,10 +130,28 @@ export class RedisService {
     }
   }
 
+  private async _connectToPubSubRedis(): Promise<void> {
+    try {
+      await RedisService.pubSubClient.connect();
+    } catch (error: any) {
+      if (error.message && error.message.includes('Socket already opened')) {
+        this.logger.debug('Redis pubsub client already connected');
+        RedisService.isPubSubConnected = true;
+      } else {
+        this.logger.error('Failed to connect to Redis PubSub:', error);
+        throw error;
+      }
+    }
+  }
+
   async onModuleDestroy() {
     if (RedisService.isConnected) {
       await RedisService.client.disconnect();
       RedisService.isConnected = false;
+    }
+    if (RedisService.isPubSubConnected) {
+      await RedisService.pubSubClient.disconnect();
+      RedisService.isPubSubConnected = false;
     }
   }
 
@@ -86,6 +159,24 @@ export class RedisService {
     return RedisService.client;
   }
 
+  getPubSubInstance(): RedisClientType {
+    return RedisService.pubSubClient;
+  }
+
+  // Pub/Sub methods using dedicated pubsub client
+  async subscribe(channel: string, callback: (message: any) => void): Promise<void> {
+    await RedisService.pubSubClient.subscribe(channel, callback);
+  }
+
+  async unsubscribe(channel: string): Promise<void> {
+    await RedisService.pubSubClient.unsubscribe(channel);
+  }
+
+  async publish(channel: string, message: any): Promise<number> {
+    return await RedisService.pubSubClient.publish(channel, JSON.stringify(message));
+  }
+
+  // Regular Redis operations using main client
   async set(key: string, value: string, ttl?: number): Promise<void> {
     if (ttl) {
       await RedisService.client.setEx(key, ttl, value);
@@ -148,25 +239,6 @@ export class RedisService {
 
   async llen(key: string): Promise<number> {
     return await this.client.lLen(key);
-  }
-
-  async publish(channel: string, message: string | object): Promise<number> {
-    const messageStr = typeof message === 'string' ? message : JSON.stringify(message);
-    return await this.client.publish(channel, messageStr);
-  }
-
-  async subscribe(channel: string, callback: (message: any) => void): Promise<void> {
-    const subscriber = this.client.duplicate();
-    await subscriber.connect();
-
-    await subscriber.subscribe(channel, (message) => {
-      try {
-        const parsedMessage = JSON.parse(message);
-        callback(parsedMessage);
-      } catch (error) {
-        callback(message);
-      }
-    });
   }
 
   async readFromStream(streamKey: string, startId?: string, count?: number): Promise<any[]> {
@@ -312,6 +384,14 @@ export class RedisService {
 
   async acknowledgeMessage(streamKey: string, groupName: string, messageId: string): Promise<void> {
     await this.client.xAck(streamKey, groupName, messageId);
+  }
+
+  async ping(): Promise<string> {
+    return await this.client.ping();
+  }
+
+  async getStreamLength(streamKey: string): Promise<number> {
+    return await this.client.xLen(streamKey);
   }
 
   async getConsumerGroupInfo(streamKey: string): Promise<any> {

@@ -1,0 +1,52 @@
+{
+  "timestamp": "2025-08-31T04:26:35.337Z",
+  "testSummary": {
+    "total": 1,
+    "passed": 0,
+    "failed": 1,
+    "duration": 42
+  },
+  "categories": {
+    "core": {
+      "tests": [
+        {
+          "name": "WebSocket Connection",
+          "status": "FAILED",
+          "duration": 38,
+          "error": "",
+          "stack": "AggregateError [ECONNREFUSED]: \n    at internalConnectMultiple (node:net:1134:18)\n    at afterConnectMultiple (node:net:1715:7)",
+          "timestamp": "2025-08-31T04:26:35.380Z"
+        }
+      ],
+      "passed": 0,
+      "failed": 1
+    },
+    "performance": {
+      "tests": [],
+      "passed": 0,
+      "failed": 0
+    },
+    "security": {
+      "tests": [],
+      "passed": 0,
+      "failed": 0
+    },
+    "enterprise": {
+      "tests": [],
+      "passed": 0,
+      "failed": 0
+    },
+    "scalability": {
+      "tests": [],
+      "passed": 0,
+      "failed": 0
+    },
+    "reliability": {
+      "tests": [],
+      "passed": 0,
+      "failed": 0
+    }
+  },
+  "benchmarks": {},
+  "proofDocuments": []
+}

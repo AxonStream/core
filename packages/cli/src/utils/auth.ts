@@ -1,9 +1,9 @@
 import { jwtDecode } from 'jwt-decode';
 import chalk from 'chalk';
 
-interface AxonPulsJwtPayload {
+export interface AxonPulsJwtPayload {
     sub: string;
-    orgId: string;
+    orgId?: string;
     organizationId?: string;
     email?: string;
     organizationSlug?: string;
@@ -23,8 +23,9 @@ export function validateToken(token: string): TokenValidationResult {
     try {
         const payload = jwtDecode<AxonPulsJwtPayload>(token);
 
-        // Check required fields for AxonPuls
-        if (!payload.sub || !payload.orgId) {
+        // Check required fields for AxonPuls - support both orgId and organizationId
+        const orgId = payload.orgId || payload.organizationId;
+        if (!payload.sub || !orgId) {
             return {
                 valid: false,
                 error: 'Token missing required fields (sub, organizationId)',
@@ -41,7 +42,11 @@ export function validateToken(token: string): TokenValidationResult {
 
         return {
             valid: true,
-            payload,
+            payload: {
+                ...payload,
+                orgId,
+                organizationId: orgId
+            },
         };
     } catch (error: any) {
         return {
@@ -63,11 +68,13 @@ export function displayTokenInfo(token: string): void {
     const { payload } = result;
     if (!payload) return;
 
+    const orgId = payload.orgId || payload.organizationId;
+
     console.log(chalk.green('✓ Valid token'));
     console.log();
     console.log(chalk.blue('Token information:'));
     console.log(`  Subject (User ID): ${chalk.cyan(payload.sub)}`);
-    console.log(`  Organization ID: ${chalk.cyan(payload.orgId)}`);
+    console.log(`  Organization ID: ${chalk.cyan(orgId)}`);
 
     if (payload.email) {
         console.log(`  Email: ${chalk.cyan(payload.email)}`);
@@ -108,5 +115,7 @@ export function displayTokenInfo(token: string): void {
 
 export function getTokenOrgId(token: string): string | null {
     const result = validateToken(token);
-    return result.valid && result.payload ? result.payload.orgId : null;
+    if (!result.valid || !result.payload) return null;
+
+    return result.payload.orgId || result.payload.organizationId || null;
 }

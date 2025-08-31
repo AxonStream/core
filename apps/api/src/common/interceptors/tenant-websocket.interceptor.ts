@@ -3,6 +3,9 @@ import { WsException } from '@nestjs/websockets';
 import { Socket } from 'socket.io';
 import { JwtService } from '@nestjs/jwt';
 import { TenantAwareService, TenantContext } from '../services/tenant-aware.service';
+import { TenantJwtService } from '../services/tenant-jwt.service';
+import { TenantRoomService } from '../services/tenant-room.service';
+import { TenantRateLimitService } from '../services/tenant-rate-limit.service';
 
 export interface TenantSocket extends Socket {
   tenantContext?: TenantContext;
@@ -18,7 +21,10 @@ export class TenantWebSocketInterceptor {
   constructor(
     private readonly jwtService: JwtService,
     private readonly tenantAwareService: TenantAwareService,
-  ) {}
+    private readonly tenantJwtService: TenantJwtService,
+    private readonly tenantRoomService: TenantRoomService,
+    private readonly tenantRateLimitService: TenantRateLimitService,
+  ) { }
 
   /**
    * Authenticate and establish tenant context for WebSocket connection
@@ -26,7 +32,7 @@ export class TenantWebSocketInterceptor {
   async authenticateConnection(socket: TenantSocket): Promise<void> {
     try {
       const tenantContext = await this.extractTenantContext(socket);
-      
+
       if (!tenantContext) {
         throw new WsException('Authentication required');
       }
@@ -43,8 +49,10 @@ export class TenantWebSocketInterceptor {
       socket.userId = tenantContext.userId;
       socket.isAuthenticated = true;
 
-      // Join tenant-specific rooms
-      await this.joinTenantRooms(socket, tenantContext);
+      // Join tenant-specific rooms (using shared service)
+      await this.tenantRoomService.joinTenantRooms(socket, tenantContext, {
+        useSimpleRoles: true
+      });
 
       this.logger.log(`WebSocket authenticated for org: ${tenantContext.organizationId}, user: ${tenantContext.userId}`);
     } catch (error) {
@@ -72,16 +80,19 @@ export class TenantWebSocketInterceptor {
         await this.validateChannelAccess(socket.tenantContext, data.channel);
       }
 
-      // Check rate limits
-      await this.checkMessageRateLimits(socket.tenantContext);
+      // Check rate limits (using shared service)
+      await this.tenantRateLimitService.checkRedisRateLimit(socket.tenantContext, {
+        enableBurstProtection: true,
+        logWarnings: true
+      });
 
       return true;
     } catch (error) {
       this.logger.error(`Message validation failed: ${error.message}`);
-      socket.emit('error', { 
-        message: 'Message validation failed', 
+      socket.emit('error', {
+        message: 'Message validation failed',
         code: 'VALIDATION_FAILED',
-        details: error.message 
+        details: error.message
       });
       return false;
     }
@@ -130,14 +141,14 @@ export class TenantWebSocketInterceptor {
   }
 
   private async extractTenantContext(socket: TenantSocket): Promise<TenantContext | null> {
-    // Method 1: Extract from auth token in handshake
-    const tokenContext = await this.extractFromToken(socket);
+    // Method 1: Extract from auth token in handshake (using shared service)
+    const tokenContext = await this.tenantJwtService.extractFromHandshake(socket);
     if (tokenContext) {
       return tokenContext;
     }
 
-    // Method 2: Extract from query parameters
-    const queryContext = await this.extractFromQuery(socket);
+    // Method 2: Extract from query parameters (using shared service)
+    const queryContext = await this.tenantJwtService.extractFromQuery(socket.handshake.query);
     if (queryContext) {
       return queryContext;
     }
@@ -145,45 +156,9 @@ export class TenantWebSocketInterceptor {
     return null;
   }
 
-  private async extractFromToken(socket: TenantSocket): Promise<TenantContext | null> {
-    try {
-      const token = socket.handshake.auth?.token || socket.handshake.query?.token;
-      if (!token) {
-        return null;
-      }
+  // JWT token extraction now handled by TenantJwtService
 
-      const payload = this.jwtService.verify(token as string);
-      
-      if (payload.organizationId && payload.sub) {
-        return await this.tenantAwareService.createTenantContext(
-          payload.organizationId,
-          payload.sub,
-          payload.permissions
-        );
-      }
-
-      return null;
-    } catch (error) {
-      this.logger.debug(`Token extraction failed: ${error.message}`);
-      return null;
-    }
-  }
-
-  private async extractFromQuery(socket: TenantSocket): Promise<TenantContext | null> {
-    try {
-      const organizationId = socket.handshake.query?.organizationId as string;
-      const userId = socket.handshake.query?.userId as string;
-
-      if (organizationId) {
-        return await this.tenantAwareService.createTenantContext(organizationId, userId);
-      }
-
-      return null;
-    } catch (error) {
-      this.logger.debug(`Query extraction failed: ${error.message}`);
-      return null;
-    }
-  }
+  // Query extraction now handled by TenantJwtService
 
   private async checkConnectionLimits(context: TenantContext): Promise<void> {
     try {
@@ -193,24 +168,11 @@ export class TenantWebSocketInterceptor {
     }
   }
 
-  private async joinTenantRooms(socket: TenantSocket, context: TenantContext): Promise<void> {
-    // Join organization room
-    socket.join(`org:${context.organizationId}`);
-
-    // Join user room if user is specified
-    if (context.userId) {
-      socket.join(`user:${context.userId}`);
-    }
-
-    // Join role-based room
-    if (context.userRole) {
-      socket.join(`role:${context.organizationId}:${context.userRole}`);
-    }
-  }
+  // Room management now handled by TenantRoomService
 
   private async leaveTenantRooms(socket: TenantSocket, context: TenantContext): Promise<void> {
     socket.leave(`org:${context.organizationId}`);
-    
+
     if (context.userId) {
       socket.leave(`user:${context.userId}`);
     }
@@ -235,8 +197,8 @@ export class TenantWebSocketInterceptor {
     }
 
     const hasPermission = context.permissions?.includes(requiredPermission) ||
-                         context.permissions?.includes('*:*') ||
-                         context.userRole === 'admin';
+      context.permissions?.includes('*:*') ||
+      context.userRole === 'admin';
 
     if (!hasPermission) {
       throw new WsException(`Insufficient permissions for event: ${event}`);
@@ -253,22 +215,7 @@ export class TenantWebSocketInterceptor {
     // Additional channel-specific validation can be added here
   }
 
-  private async checkMessageRateLimits(context: TenantContext): Promise<void> {
-    // Implement message rate limiting per tenant
-    // This is a simplified version - in production, use more sophisticated rate limiting
-    const redis = this.tenantAwareService['redisService'].getRedisInstance();
-    const key = `tenant:${context.organizationId}:ws_messages:${Math.floor(Date.now() / 60000)}`; // Per minute
-    
-    const count = await redis.incr(key);
-    await redis.expire(key, 120); // 2 minutes TTL
-
-    const limits = await this.tenantAwareService.getTenantLimits(context.organizationId);
-    const maxMessagesPerMinute = limits.maxApiCalls / 60; // Approximate
-
-    if (count > maxMessagesPerMinute) {
-      throw new WsException('Message rate limit exceeded');
-    }
-  }
+  // Rate limiting now handled by TenantRateLimitService
 
   private filterSensitiveData(data: any, context: TenantContext): any {
     if (!data || typeof data !== 'object') {
@@ -302,7 +249,7 @@ export function TenantWebSocketGuard() {
 
     descriptor.value = async function (...args: any[]) {
       const socket = args[0] as TenantSocket;
-      
+
       if (!socket.isAuthenticated || !socket.tenantContext) {
         socket.emit('error', { message: 'Authentication required', code: 'AUTH_REQUIRED' });
         return;

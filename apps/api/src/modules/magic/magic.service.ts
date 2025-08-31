@@ -108,7 +108,7 @@ export class MagicService {
                     version: 0,
                 },
                 currentState: initialState,
-                conflictResolution: config.conflictResolution || 'operational_transform',
+                conflictResolution: config.conflictResolution || 'operational_transform' as any,
             },
             organizationId: context.organizationId,
             userId: context.userId,
