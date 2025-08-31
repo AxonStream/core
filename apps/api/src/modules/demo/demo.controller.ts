@@ -5,11 +5,12 @@
  * Following market standards from Stripe, Firebase, Pusher
  */
 
-import { Controller, Post, Get, Body, HttpCode, HttpStatus, Query } from '@nestjs/common';
+import { Controller, Post, Get, Body, HttpCode, HttpStatus, Query, Req } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { Public } from '../auth/decorators/public.decorator';
 import { DemoService } from './demo.service';
 import { PublishDemoEventDto, UpgradeInfoDto } from './dto/demo.dto';
+import { Request } from 'express';
 
 @ApiTags('demo')
 @Controller('demo')
@@ -19,12 +20,12 @@ export class DemoController {
   @Public()
   @Get('token')
   @ApiOperation({
-    summary: 'Get demo access token',
-    description: 'Generate a temporary token for demo access - no registration required',
+    summary: 'Get enhanced demo access token',
+    description: 'Generate a comprehensive demo token with server-side session tracking',
   })
   @ApiResponse({
     status: 200,
-    description: 'Demo token generated',
+    description: 'Enhanced demo token generated with comprehensive access',
     schema: {
       type: 'object',
       properties: {
@@ -53,8 +54,8 @@ export class DemoController {
       },
     },
   })
-  async getDemoToken() {
-    return this.demoService.generateDemoToken();
+  async getDemoToken(@Req() req: Request) {
+    return this.demoService.generateDemoToken(req);
   }
 
   @Public()
@@ -138,5 +139,63 @@ export class DemoController {
     @Body() data: UpgradeInfoDto,
   ) {
     return this.demoService.getUpgradeInfo(data);
+  }
+
+  @Public()
+  @Post('session/validate')
+  @ApiOperation({
+    summary: 'Validate demo session',
+    description: 'Server-side validation of demo token and session tracking',
+  })
+  async validateDemoSession(@Body() body: { token: string }) {
+    const session = await this.demoService.validateDemoSession(body.token);
+    return {
+      valid: !!session,
+      session: session || null,
+    };
+  }
+
+  @Public()
+  @Post('usage/track')
+  @ApiOperation({
+    summary: 'Track feature usage',
+    description: 'Track when demo users use specific features',
+  })
+  async trackFeatureUsage(
+    @Body() body: {
+      sessionId: string;
+      featureName: string;
+      featureCategory: string;
+    }
+  ) {
+    await this.demoService.trackFeatureUsage(
+      body.sessionId,
+      body.featureName,
+      body.featureCategory,
+      0 // Initial usage count
+    );
+
+    const limits = await this.demoService.checkDemoLimits(
+      body.sessionId,
+      body.featureName
+    );
+
+    return {
+      success: true,
+      limits,
+    };
+  }
+
+  @Public()
+  @Get('limits/:sessionId/:feature')
+  @ApiOperation({
+    summary: 'Check demo limits',
+    description: 'Check if demo session has reached feature limits',
+  })
+  async checkDemoLimits(
+    @Query('sessionId') sessionId: string,
+    @Query('feature') feature: string,
+  ) {
+    return this.demoService.checkDemoLimits(sessionId, feature);
   }
 }

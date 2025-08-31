@@ -1,13 +1,15 @@
 import { useAxonpulsChannel } from './hooks/useAxonpulsChannel';
 import { useAxonpulsHITL } from './hooks/useAxonpulsHITL';
 import { useAxonpulsPresence } from './hooks/useAxonpulsPresence';
-import { useAxonpuls } from './hooks/useAxonpuls';
+import { useAxonpuls, useOrganization, useHealth } from './hooks/useAxonpuls';
 import { useAxonpulsMagic } from './hooks/useAxonpulsMagic';
 import { useAxonpulsWebhooks } from './hooks/useAxonpulsWebhooks';
 
 // Main AXONPULS React Hooks Library
 export {
     useAxonpuls,
+    useOrganization,
+    useHealth,
     useAxonpulsChannel,
     useAxonpulsHITL,
     useAxonpulsPresence,

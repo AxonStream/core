@@ -38,10 +38,13 @@ function now() { return Date.now(); }
 
 function safeRequire<T = any>(id: string): T | null {
   try {
-    // Avoid bundler static analysis; eslint-disable-next-line no-eval
-    const req = eval('require');
-    if (typeof req === 'function') {
-      return req(id) as T;
+    // Use dynamic import or global require if available
+    if (typeof require !== 'undefined') {
+      return require(id) as T;
+    }
+    // Check if require is available in global scope (Node.js)
+    if (typeof global !== 'undefined' && (global as any).require) {
+      return (global as any).require(id) as T;
     }
   } catch { /* ignore */ }
   return null;

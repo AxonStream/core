@@ -37,6 +37,33 @@ export const websocketConfig = registerAs('websocket', () => {
       initialDelay: safeParseInt(process.env.WS_RETRY_INITIAL_DELAY, 1000, { required: false }),
       maxDelay: safeParseInt(process.env.WS_RETRY_MAX_DELAY, 30000, { required: false }),
     },
+    multiServer: {
+      enabled: safeParseBool(process.env.WS_MULTI_SERVER_ENABLED, true, { required: false }),
+      serverRegistry: {
+        heartbeatInterval: safeParseInt(process.env.WS_SERVER_HEARTBEAT_INTERVAL, 30000, { required: false }),
+        serverTtl: safeParseInt(process.env.WS_SERVER_TTL, 90, { required: false }),
+        cleanupInterval: safeParseInt(process.env.WS_SERVER_CLEANUP_INTERVAL, 60000, { required: false }),
+      },
+      crossServerRouting: {
+        enabled: safeParseBool(process.env.WS_CROSS_SERVER_ROUTING, true, { required: false }),
+        messageTtl: safeParseInt(process.env.WS_CROSS_SERVER_MESSAGE_TTL, 300, { required: false }),
+        maxRetryAttempts: safeParseInt(process.env.WS_CROSS_SERVER_MAX_RETRIES, 3, { required: false }),
+        acknowledgmentTimeout: safeParseInt(process.env.WS_CROSS_SERVER_ACK_TIMEOUT, 5000, { required: false }),
+      },
+      loadBalancing: {
+        enabled: safeParseBool(process.env.WS_LOAD_BALANCING_ENABLED, true, { required: false }),
+        strategy: process.env.WS_LOAD_BALANCING_STRATEGY || 'least_connections',
+        capacityThreshold: safeParseFloat(process.env.WS_CAPACITY_THRESHOLD, 0.8, { required: false }),
+        migrationEnabled: safeParseBool(process.env.WS_CONNECTION_MIGRATION, false, { required: false }),
+        migrationInterval: safeParseInt(process.env.WS_MIGRATION_INTERVAL, 300000, { required: false }),
+      },
+      healthCheck: {
+        enabled: safeParseBool(process.env.WS_HEALTH_CHECK_ENABLED, true, { required: false }),
+        interval: safeParseInt(process.env.WS_HEALTH_CHECK_INTERVAL, 30000, { required: false }),
+        timeout: safeParseInt(process.env.WS_HEALTH_CHECK_TIMEOUT, 5000, { required: false }),
+        unhealthyThreshold: safeParseInt(process.env.WS_UNHEALTHY_THRESHOLD, 3, { required: false }),
+      },
+    },
   };
 
   // Log configuration summary (with sensitive data redacted)

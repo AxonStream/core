@@ -4,6 +4,8 @@ import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '../../common/services/prisma.service';
 import { User, Organization } from '@prisma/client';
+import { SessionService } from './services/session.service';
+import { WSTicketService } from './services/ws-ticket.service';
 
 import { LoginDto, RegisterDto } from './dto';
 
@@ -17,6 +19,7 @@ export interface JwtPayload {
   iat?: number;
   exp?: number;
   isTrial?: boolean;
+  isDemo?: boolean;
   trialStartedAt?: Date;
   expiresAt?: Date;
 }

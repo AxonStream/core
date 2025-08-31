@@ -1,0 +1,222 @@
+# AXONPULS Multi-Server WebSocket Deployment Configuration
+# This configuration demonstrates horizontal scaling with multiple server instances
+
+version: '3.9'
+
+services:
+  # Load Balancer (HAProxy with WebSocket support)
+  load-balancer:
+    image: haproxy:2.8-alpine
+    container_name: axonpuls_load_balancer
+    ports:
+      - "80:80"
+      - "443:443"
+      - "8080:8080"  # HAProxy stats
+    volumes:
+      - ./config/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+    depends_on:
+      - axonpuls-server-1
+      - axonpuls-server-2
+      - axonpuls-server-3
+    networks:
+      - axonpuls-network
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "80"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # Redis Cluster for coordination
+  redis-cluster:
+    image: redis:7-alpine
+    container_name: axonpuls_redis_cluster
+    command: [
+      "redis-server",
+      "--appendonly", "yes",
+      "--cluster-enabled", "yes",
+      "--cluster-config-file", "nodes.conf",
+      "--cluster-node-timeout", "5000",
+      "--cluster-announce-ip", "redis-cluster"
+    ]
+    ports:
+      - "6379:6379"
+      - "16379:16379"
+    volumes:
+      - redis_cluster_data:/data
+    networks:
+      - axonpuls-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # PostgreSQL Database
+  postgres:
+    image: postgres:16-alpine
+    container_name: axonpuls_postgres
+    environment:
+      POSTGRES_USER: axonpuls
+      POSTGRES_PASSWORD: axonpulspassword
+      POSTGRES_DB: axonpuls
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - axonpuls-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U axonpuls"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # AXONPULS Server Instance 1
+  axonpuls-server-1:
+    build:
+      context: ./apps/api
+      dockerfile: Dockerfile
+    container_name: axonpuls_server_1
+    environment:
+      - NODE_ENV=production
+      - SERVER_PORT=3000
+      - WS_PORT=3001
+      - DATABASE_URL=postgresql://axonpuls:axonpulspassword@postgres:5432/axonpuls?schema=public
+      - REDIS_URL=redis://redis-cluster:6379
+      - REDIS_CLUSTER_ENABLED=true
+      - WS_MULTI_SERVER_ENABLED=true
+      - WS_CORS_ORIGIN=*
+      - SERVER_ID=server-1
+      - HOSTNAME=axonpuls-server-1
+    ports:
+      - "3001:3000"
+      - "3101:3001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis-cluster:
+        condition: service_healthy
+    networks:
+      - axonpuls-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health/websocket"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # AXONPULS Server Instance 2
+  axonpuls-server-2:
+    build:
+      context: ./apps/api
+      dockerfile: Dockerfile
+    container_name: axonpuls_server_2
+    environment:
+      - NODE_ENV=production
+      - SERVER_PORT=3000
+      - WS_PORT=3001
+      - DATABASE_URL=postgresql://axonpuls:axonpulspassword@postgres:5432/axonpuls?schema=public
+      - REDIS_URL=redis://redis-cluster:6379
+      - REDIS_CLUSTER_ENABLED=true
+      - WS_MULTI_SERVER_ENABLED=true
+      - WS_CORS_ORIGIN=*
+      - SERVER_ID=server-2
+      - HOSTNAME=axonpuls-server-2
+    ports:
+      - "3002:3000"
+      - "3102:3001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis-cluster:
+        condition: service_healthy
+    networks:
+      - axonpuls-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health/websocket"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # AXONPULS Server Instance 3
+  axonpuls-server-3:
+    build:
+      context: ./apps/api
+      dockerfile: Dockerfile
+    container_name: axonpuls_server_3
+    environment:
+      - NODE_ENV=production
+      - SERVER_PORT=3000
+      - WS_PORT=3001
+      - DATABASE_URL=postgresql://axonpuls:axonpulspassword@postgres:5432/axonpuls?schema=public
+      - REDIS_URL=redis://redis-cluster:6379
+      - REDIS_CLUSTER_ENABLED=true
+      - WS_MULTI_SERVER_ENABLED=true
+      - WS_CORS_ORIGIN=*
+      - SERVER_ID=server-3
+      - HOSTNAME=axonpuls-server-3
+    ports:
+      - "3003:3000"
+      - "3103:3001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis-cluster:
+        condition: service_healthy
+    networks:
+      - axonpuls-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health/websocket"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Monitoring Stack
+  prometheus:
+    image: prom/prometheus:v2.45.0
+    container_name: axonpuls_prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+    networks:
+      - axonpuls-network
+
+  grafana:
+    image: grafana/grafana:10.0.0
+    container_name: axonpuls_grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources:ro
+    networks:
+      - axonpuls-network
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_cluster_data:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+
+networks:
+  axonpuls-network:
+    driver: bridge
+    name: axonpuls-network

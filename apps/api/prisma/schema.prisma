@@ -532,3 +532,130 @@ model MagicPresence {
   @@index([lastSeen])
   @@map("magic_presences")
 }
+
+// Demo Session Tracking
+model DemoSession {
+  id                String   @id @default(cuid())
+  sessionId         String   @unique
+  tokenHash         String
+  userId            String?
+  organizationId    String
+  ipAddress         String?
+  userAgent         String?
+  region            String?
+  country           String?
+  city              String?
+  createdAt         DateTime @default(now())
+  expiresAt         DateTime
+  lastActiveAt      DateTime @default(now())
+  isActive          Boolean  @default(true)
+  upgradePromptCount Int     @default(0)
+  upgradeClickCount Int      @default(0)
+  convertedToPaid   Boolean  @default(false)
+  convertedAt       DateTime?
+
+  // JSON fields for flexible data
+  usageStats        Json     @default("{}")
+  currentLimits     Json     @default("{}")
+  metadata          Json     @default("{}")
+
+  // Relations
+  featureUsage      FeatureUsage[]
+  conversions       UpgradeConversion[]
+
+  @@index([sessionId])
+  @@index([organizationId])
+  @@index([createdAt])
+  @@index([expiresAt])
+  @@index([isActive])
+  @@map("demo_sessions")
+}
+
+// Package Installation Tracking
+model PackageInstallation {
+  id                String   @id @default(cuid())
+  installationId    String   @unique
+  packageName       String
+  packageVersion    String
+  userId            String?
+  organizationId    String?
+  sessionId         String?
+  ipAddress         String?
+  userAgent         String?
+  region            String?
+  country           String?
+  city              String?
+  installedAt       DateTime @default(now())
+  lastUsedAt        DateTime?
+  uninstalledAt     DateTime?
+  isActive          Boolean  @default(true)
+
+  // JSON fields for environment and framework info
+  environment       Json     @default("{}")
+  framework         Json     @default("{}")
+  usageStats        Json     @default("{}")
+  installationContext Json   @default("{}")
+
+  @@index([packageName])
+  @@index([installedAt])
+  @@index([region])
+  @@index([isActive])
+  @@index([sessionId])
+  @@map("package_installations")
+}
+
+// Feature Usage Tracking
+model FeatureUsage {
+  id                String   @id @default(cuid())
+  sessionId         String
+  userId            String?
+  organizationId    String?
+  featureName       String
+  featureCategory   String
+  usageCount        Int      @default(1)
+  firstUsedAt       DateTime @default(now())
+  lastUsedAt        DateTime @default(now())
+  limitReached      Boolean  @default(false)
+  limitReachedAt    DateTime?
+  upgradePrompted   Boolean  @default(false)
+  upgradePromptedAt DateTime?
+
+  // JSON field for usage context
+  usageContext      Json     @default("{}")
+
+  // Relations
+  demoSession       DemoSession @relation(fields: [sessionId], references: [sessionId], onDelete: Cascade)
+
+  @@index([sessionId])
+  @@index([featureName])
+  @@index([lastUsedAt])
+  @@index([featureCategory])
+  @@map("feature_usage")
+}
+
+// Upgrade Conversion Tracking
+model UpgradeConversion {
+  id                String   @id @default(cuid())
+  sessionId         String
+  userId            String?
+  organizationId    String?
+  conversionType    String   // 'demo_to_trial', 'demo_to_paid', 'trial_to_paid'
+  conversionSource  String   // 'limit_reached', 'feature_prompt', 'manual'
+  convertedAt       DateTime @default(now())
+  planType          String
+  planPrice         Decimal? @db.Decimal(10, 2)
+  currency          String   @default("USD")
+
+  // JSON fields for conversion context and revenue attribution
+  conversionContext Json     @default("{}")
+  revenueAttribution Json    @default("{}")
+
+  // Relations
+  demoSession       DemoSession @relation(fields: [sessionId], references: [sessionId], onDelete: Cascade)
+
+  @@index([sessionId])
+  @@index([conversionType])
+  @@index([convertedAt])
+  @@index([planType])
+  @@map("upgrade_conversions")
+}

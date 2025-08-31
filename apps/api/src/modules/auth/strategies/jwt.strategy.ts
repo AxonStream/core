@@ -28,6 +28,11 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       return this.validateTrialToken(payload);
     }
 
+    // Handle demo tokens - no user lookup required
+    if (payload.isDemo) {
+      return this.validateDemoToken(payload);
+    }
+
     // Existing validation for real users
     const user = await this.authService.getUserById(payload.sub);
 
@@ -52,6 +57,77 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       roles: payload.roles || [],
       permissions: payload.permissions || [],
       user,
+    };
+  }
+
+  /**
+   * Validate demo tokens - comprehensive validation with seamless UX
+   */
+  private validateDemoToken(payload: JwtPayload) {
+    // Check if demo expired
+    if (payload.expiresAt && new Date() > new Date(payload.expiresAt)) {
+      throw new UnauthorizedException({
+        message: 'Demo period expired',
+        code: 'DEMO_EXPIRED',
+        upgradeUrl: '/upgrade',
+        upgradeMessage: 'Your demo has expired. Upgrade to continue with unlimited access.',
+        demoExpiresAt: payload.expiresAt,
+      });
+    }
+
+    // Validate demo token structure
+    if (!payload.sub?.startsWith('demo_')) {
+      throw new UnauthorizedException({
+        message: 'Invalid demo token',
+        code: 'INVALID_DEMO_TOKEN',
+        action: 'regenerate',
+      });
+    }
+
+    // Validate organization context for demo
+    if (!payload.organizationId || !payload.organizationSlug || payload.organizationSlug !== 'demo-org') {
+      throw new UnauthorizedException({
+        message: 'Invalid demo organization context',
+        code: 'INVALID_DEMO_ORG',
+        action: 'regenerate',
+      });
+    }
+
+    // Calculate time remaining for UX
+    const expiresAt = new Date(payload.expiresAt);
+    const now = new Date();
+    const timeRemaining = expiresAt.getTime() - now.getTime();
+    const minutesRemaining = Math.floor(timeRemaining / (1000 * 60));
+
+    // Warn when demo is expiring soon (30 minutes)
+    const isExpiringSoon = minutesRemaining <= 30 && minutesRemaining > 0;
+
+    return {
+      userId: payload.sub,
+      email: payload.email || 'demo@axonstream.ai',
+      organizationId: payload.organizationId,
+      organizationSlug: payload.organizationSlug,
+      roles: payload.roles || ['demo'],
+      permissions: payload.permissions || [],
+      isDemo: true,
+      demoExpiresAt: payload.expiresAt,
+      timeRemaining: minutesRemaining,
+      isExpiringSoon,
+      upgradePrompt: isExpiringSoon ? {
+        title: 'Demo Expiring Soon',
+        message: `Your demo expires in ${minutesRemaining} minutes. Upgrade now to continue with unlimited access.`,
+        ctaText: 'Upgrade Now',
+        ctaUrl: '/upgrade',
+        urgency: 'high',
+      } : null,
+      user: null, // No real user for demo tokens
+      sessionMetadata: {
+        sessionId: payload.sub,
+        sessionType: 'demo',
+        createdAt: payload.iat ? new Date(payload.iat * 1000) : null,
+        expiresAt: payload.expiresAt,
+        permissions: payload.permissions?.length || 0,
+      },
     };
   }
 

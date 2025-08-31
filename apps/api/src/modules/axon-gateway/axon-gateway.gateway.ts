@@ -19,6 +19,10 @@ import { SubscriptionManagerService } from '../subscription-manager/subscription
 import { MagicService } from '../magic/magic.service';
 import { MagicPresenceService } from '../magic/services/magic-presence.service';
 import { TenantContext } from '../../common/services/tenant-aware.service';
+import { WebSocketServerRegistryService } from '../../common/services/websocket-server-registry.service';
+import { CrossServerEventRouterService } from '../../common/services/cross-server-event-router.service';
+import { DistributedConnectionManagerService } from '../../common/services/distributed-connection-manager.service';
+import { MultiServerGatewayService } from './multi-server-gateway.service';
 
 interface AuthenticatedSocket extends Socket {
   userId?: string;
@@ -68,11 +72,24 @@ export class AxonpulsGateway implements OnGatewayInit, OnGatewayConnection, OnGa
     private subscriptionManager: SubscriptionManagerService,
     private magicService: MagicService,
     private magicPresence: MagicPresenceService,
+    private serverRegistry: WebSocketServerRegistryService,
+    private crossServerRouter: CrossServerEventRouterService,
+    private distributedConnectionManager: DistributedConnectionManagerService,
+    private multiServerGateway: MultiServerGatewayService,
   ) { }
 
   afterInit(server: Server) {
     this.logger.log('AXONPULS WebSocket Gateway initialized - Real-time messaging ready');
     this.setupHeartbeat();
+
+    // Initialize multi-server gateway
+    this.multiServerGateway.server = server;
+
+    // Check if multi-server mode is enabled
+    const multiServerEnabled = this.configService.get<boolean>('websocket.multiServer.enabled', true);
+    if (multiServerEnabled) {
+      this.logger.log('Multi-server WebSocket coordination enabled');
+    }
   }
 
   async handleConnection(client: AuthenticatedSocket) {
@@ -111,6 +128,7 @@ export class AxonpulsGateway implements OnGatewayInit, OnGatewayConnection, OnGa
       client.organizationId = user.organizationId;
       client.organizationSlug = payload.organizationSlug;
       client.sessionId = this.generateSessionId();
+      client.clientType = client.handshake.headers['user-agent'] || 'unknown';
 
       // Store connection in database
       await this.createConnection(client);
@@ -121,11 +139,18 @@ export class AxonpulsGateway implements OnGatewayInit, OnGatewayConnection, OnGa
       // Join organization room
       client.join(`org:${client.organizationId}`);
 
+      // Register with multi-server system if enabled
+      const multiServerEnabled = this.configService.get<boolean>('websocket.multiServer.enabled', true);
+      if (multiServerEnabled) {
+        await this.multiServerGateway.handleConnection(client as any);
+      }
+
       // Send connection confirmation
       client.emit('connected', {
         sessionId: client.sessionId,
         userId: client.userId,
         organizationId: client.organizationId,
+        serverId: this.serverRegistry.getServerId(),
         timestamp: new Date().toISOString(),
       });
 
@@ -140,6 +165,12 @@ export class AxonpulsGateway implements OnGatewayInit, OnGatewayConnection, OnGa
   async handleDisconnect(client: AuthenticatedSocket) {
     try {
       this.logger.log(`Client disconnecting: ${client.id}`);
+
+      // Handle multi-server disconnection if enabled
+      const multiServerEnabled = this.configService.get<boolean>('websocket.multiServer.enabled', true);
+      if (multiServerEnabled) {
+        await this.multiServerGateway.handleDisconnection(client as any);
+      }
 
       // Update connection status in database
       if (client.sessionId) {
@@ -620,22 +651,80 @@ export class AxonpulsGateway implements OnGatewayInit, OnGatewayConnection, OnGa
 
   // Public methods for external use
   async broadcastToChannel(channel: string, organizationId: string, message: any) {
-    const roomName = this.getChannelRoom(channel, organizationId);
-    this.server.to(roomName).emit('event', message);
+    const multiServerEnabled = this.configService.get<boolean>('websocket.multiServer.enabled', true);
+
+    if (multiServerEnabled) {
+      // Use multi-server broadcasting
+      await this.multiServerGateway.broadcastToAllServers(organizationId, channel, message);
+    } else {
+      // Use local broadcasting only
+      const roomName = this.getChannelRoom(channel, organizationId);
+      this.server.to(roomName).emit('event', message);
+    }
   }
 
   async broadcastToOrganization(organizationId: string, message: any) {
-    this.server.to(`org:${organizationId}`).emit('event', message);
+    const multiServerEnabled = this.configService.get<boolean>('websocket.multiServer.enabled', true);
+
+    if (multiServerEnabled) {
+      // Use multi-server broadcasting
+      await this.multiServerGateway.sendToOrganization(organizationId, 'general', message);
+    } else {
+      // Use local broadcasting only
+      this.server.to(`org:${organizationId}`).emit('event', message);
+    }
+  }
+
+  async sendToUser(userId: string, organizationId: string, message: any): Promise<boolean> {
+    const multiServerEnabled = this.configService.get<boolean>('websocket.multiServer.enabled', true);
+
+    if (multiServerEnabled) {
+      // Use multi-server user targeting
+      return await this.multiServerGateway.sendToUser(userId, organizationId, 'direct', message);
+    } else {
+      // Use local user targeting only
+      const userSocket = Array.from(this.connectedClients.values()).find(
+        client => client.userId === userId && client.organizationId === organizationId
+      );
+
+      if (userSocket) {
+        userSocket.emit('event', message);
+        return true;
+      }
+      return false;
+    }
   }
 
   getConnectedClientsCount(): number {
     return this.connectedClients.size;
   }
 
+  async getClusterConnectedClientsCount(): Promise<number> {
+    const multiServerEnabled = this.configService.get<boolean>('websocket.multiServer.enabled', true);
+
+    if (multiServerEnabled) {
+      const stats = await this.multiServerGateway.getClusterConnectionStats();
+      return stats.totalConnections;
+    } else {
+      return this.connectedClients.size;
+    }
+  }
+
   getConnectedClientsByOrganization(organizationId: string): AuthenticatedSocket[] {
     return Array.from(this.connectedClients.values()).filter(
       client => client.organizationId === organizationId
     );
+  }
+
+  async getClusterConnectionsByOrganization(organizationId: string): Promise<number> {
+    const multiServerEnabled = this.configService.get<boolean>('websocket.multiServer.enabled', true);
+
+    if (multiServerEnabled) {
+      const stats = await this.multiServerGateway.getClusterConnectionStats();
+      return stats.organizationConnections[organizationId] || 0;
+    } else {
+      return this.getConnectedClientsByOrganization(organizationId).length;
+    }
   }
 
   /**

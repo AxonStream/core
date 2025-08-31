@@ -13,6 +13,8 @@ interface AxonPulsClient {
     request(method: string, endpoint: string, data?: any): Promise<any>;
     getOrganizationId(): string;
     getUserId(): string;
+    organization?: any; // Organization client
+    health?: any; // Health client
 }
 
 /**
@@ -334,5 +336,29 @@ export function useAxonpuls(config: AxonpulsConfig = {}): AxonpulsConnection {
         subscribe,
         unsubscribe,
         request,
+    };
+}
+
+/**
+ * Hook for organization management
+ */
+export function useOrganization() {
+    const { client } = useAxonpuls();
+
+    return {
+        organization: client?.organization,
+        isReady: !!client?.organization,
+    };
+}
+
+/**
+ * Hook for health monitoring
+ */
+export function useHealth() {
+    const { client } = useAxonpuls();
+
+    return {
+        health: client?.health,
+        isReady: !!client?.health,
     };
 }

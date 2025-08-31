@@ -1,5 +1,5 @@
 {
-  "name": "@axonstreamai/axonpuls-api",
+  "name": "@axonstream/api",
   "version": "1.0.0",
   "description": "AxonPuls Real-Time Backend - Production-grade WebSocket and event streaming platform",
   "author": "AxonPuls Team",
@@ -43,8 +43,7 @@
   ],
   "license": "MIT",
   "dependencies": {
-    "@axonstream/core": "file:../../dist-tarballs/axonstream-core-1.0.0.tgz",
-    "@axonstream/monorepo": "file:../..",
+    "@axonstream/core": "workspace:*",
     "@fastify/cors": "^11.1.0",
     "@fastify/helmet": "^13.0.1",
     "@fastify/rate-limit": "^10.3.0",
@@ -72,8 +71,10 @@
     "bull": "^4.16.5",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.2",
+    "cookie": "^0.6.0",
     "fastify": "^5.4.0",
     "ioredis": "^5.7.0",
+    "jose": "^5.9.3",
     "jsonwebtoken": "^9.0.2",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",

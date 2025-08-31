@@ -10,6 +10,7 @@ import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { TenantAwareService } from '../../common/services/tenant-aware.service';
 import { PrismaService } from '../../common/services/prisma.service';
+import { SessionService } from '../auth/services/session.service';
 
 export interface DemoEvent {
   id: string;
@@ -18,6 +19,21 @@ export interface DemoEvent {
   payload: any;
   timestamp: Date;
   source: 'demo';
+}
+
+export interface FeatureGateResult {
+  allowed: boolean;
+  reason?: string;
+  upgradeRequired?: boolean;
+  currentUsage?: number;
+  limit?: number;
+  upgradePrompt?: {
+    urgency: string;
+    title: string;
+    message: string;
+    ctaText: string;
+    ctaUrl: string;
+  };
 }
 
 export interface DemoChannel {
@@ -41,6 +57,7 @@ export class DemoService {
     private readonly configService: ConfigService,
     private readonly tenantAwareService: TenantAwareService,
     private readonly prismaService: PrismaService,
+    private readonly sessionService: SessionService,
   ) {
     this.initializeDemoData();
   }
@@ -48,13 +65,15 @@ export class DemoService {
   /**
    * Generate demo access token
    */
-  async generateDemoToken(): Promise<{
+  async generateDemoToken(req?: any): Promise<{
     success: boolean;
     token: string;
     org: string;
     expiresIn: string;
     expiresAt: string;
+    sessionId: string;
     limitations: any;
+    accessGranted: any;
     nextSteps: any;
   }> {
     try {
@@ -129,12 +148,46 @@ export class DemoService {
         expiresAt: expiresAt.toISOString(),
       };
 
+      // Extract request metadata for analytics
+      const ipAddress = req?.ip || req?.connection?.remoteAddress || 'unknown';
+      const userAgent = req?.get('User-Agent') || 'unknown';
+
+      // Create session-based demo authentication
+      const session = await this.sessionService.createSession({
+        userId: payload.sub,
+        orgId: demoOrg.id,
+        orgSlug: demoOrg.slug,
+        roleIds: payload.roles,
+        permissions: payload.permissions,
+        pv: 1,
+        ua: userAgent,
+        ip: ipAddress,
+        isDemo: true,
+        demoExpiresAt: expiresAt,
+        sessionType: 'demo',
+      }, 1); // 1 day TTL for demo sessions
+
+      // Generate a demo token for backward compatibility (if needed)
       const token = this.jwtService.sign(payload, { expiresIn: '2h' });
+
+      // Create demo session record for analytics
+      const sessionId = session.sid;
+      const tokenHash = this.createTokenHash(token);
+
+      await this.createDemoSession({
+        sessionId,
+        tokenHash,
+        organizationId: demoOrg.id,
+        ipAddress,
+        userAgent,
+        expiresAt,
+      });
 
       return {
         success: true,
         token,
         org: demoOrg.slug,
+        sessionId,
         expiresIn: '2h',
         expiresAt: expiresAt.toISOString(),
         limitations: {
@@ -346,7 +399,7 @@ export class DemoService {
   /**
    * Get upgrade information
    */
-  async getUpgradeInfo(data: { email?: string; useCase?: string }): Promise<{
+  async getUpgradeInfo(_data: { email?: string; useCase?: string }): Promise<{
     success: boolean;
     message: string;
     benefits: string[];
@@ -473,5 +526,256 @@ export class DemoService {
     this.rateLimitMap.set(clientId, validRequests);
 
     return true;
+  }
+
+  /**
+   * Create token hash for session tracking
+   */
+  private createTokenHash(token: string): string {
+    const crypto = require('crypto');
+    return crypto.createHash('sha256').update(token).digest('hex');
+  }
+
+  /**
+   * Create demo session record in database
+   */
+  private async createDemoSession(sessionData: {
+    sessionId: string;
+    tokenHash: string;
+    organizationId: string;
+    ipAddress: string;
+    userAgent: string;
+    expiresAt: Date;
+  }): Promise<void> {
+    try {
+      await this.prismaService.demoSession.create({
+        data: {
+          sessionId: sessionData.sessionId,
+          tokenHash: sessionData.tokenHash,
+          organizationId: sessionData.organizationId,
+          ipAddress: sessionData.ipAddress,
+          userAgent: sessionData.userAgent,
+          expiresAt: sessionData.expiresAt,
+          usageStats: {
+            eventsPublished: 0,
+            channelsCreated: 0,
+            magicRoomsJoined: 0,
+            webhooksCreated: 0,
+            apiCallsCount: 0,
+          },
+          currentLimits: {
+            maxChannels: 20,
+            maxEvents: 1000,
+            maxMagicRooms: 5,
+            maxWebhooks: 3,
+            maxApiCalls: 10000,
+            rateLimit: 50,
+          },
+          metadata: {
+            createdVia: 'demo-token-generation',
+            platform: 'web',
+          },
+        },
+      });
+
+      this.logger.log(`Demo session created: ${sessionData.sessionId}`);
+    } catch (error) {
+      this.logger.error(`Failed to create demo session: ${error.message}`);
+      // Don't throw error - session tracking is optional
+    }
+  }
+
+  /**
+   * Validate demo token and get session
+   */
+  async validateDemoSession(token: string): Promise<any> {
+    try {
+      // Verify JWT token
+      const payload = this.jwtService.verify(token);
+
+      if (!payload.isDemo) {
+        return null;
+      }
+
+      // Get session from database
+      const tokenHash = this.createTokenHash(token);
+      const session = await this.prismaService.demoSession.findFirst({
+        where: {
+          sessionId: payload.sub,
+          tokenHash,
+          isActive: true,
+          expiresAt: {
+            gt: new Date(),
+          },
+        },
+      });
+
+      if (!session) {
+        return null;
+      }
+
+      // Update last active time
+      await this.prismaService.demoSession.update({
+        where: { id: session.id },
+        data: { lastActiveAt: new Date() },
+      });
+
+      return {
+        sessionId: session.sessionId,
+        organizationId: session.organizationId,
+        expiresAt: session.expiresAt,
+        usageStats: session.usageStats,
+        currentLimits: session.currentLimits,
+        isActive: session.isActive,
+      };
+    } catch (error) {
+      this.logger.error(`Failed to validate demo session: ${error.message}`);
+      return null;
+    }
+  }
+
+  /**
+   * Track feature usage for demo session
+   */
+  async trackFeatureUsage(sessionId: string, featureName: string, featureCategory: string, _currentUsage: number): Promise<void> {
+    try {
+      // Find existing feature usage record
+      const existingUsage = await this.prismaService.featureUsage.findFirst({
+        where: {
+          sessionId,
+          featureName,
+        },
+      });
+
+      if (existingUsage) {
+        // Update existing record
+        await this.prismaService.featureUsage.update({
+          where: { id: existingUsage.id },
+          data: {
+            usageCount: { increment: 1 },
+            lastUsedAt: new Date(),
+          },
+        });
+      } else {
+        // Create new record
+        await this.prismaService.featureUsage.create({
+          data: {
+            sessionId,
+            featureName,
+            featureCategory,
+            usageCount: 1,
+            usageContext: {
+              userAgent: 'demo',
+              ipAddress: 'demo',
+            },
+          },
+        });
+      }
+
+      this.logger.debug(`Feature usage tracked: ${featureName} for session ${sessionId}`);
+    } catch (error) {
+      this.logger.error(`Failed to track feature usage: ${error.message}`);
+    }
+  }
+
+  /**
+   * Check if demo session has reached limits
+   */
+  async checkDemoLimits(sessionId: string, featureName: string): Promise<{
+    withinLimits: boolean;
+    currentUsage: number;
+    limit: number;
+    upgradePrompted?: boolean;
+  }> {
+    try {
+      const session = await this.prismaService.demoSession.findUnique({
+        where: { sessionId },
+        include: {
+          featureUsage: {
+            where: { featureName },
+          },
+        },
+      });
+
+      if (!session) {
+        return { withinLimits: false, currentUsage: 0, limit: 0 };
+      }
+
+      const limits = session.currentLimits as any;
+      const usage = session.featureUsage[0]?.usageCount || 0;
+      const limit = limits[`max${featureName.charAt(0).toUpperCase() + featureName.slice(1)}`] || 0;
+
+      const withinLimits = usage < limit;
+
+      // Check if we should show upgrade prompt (at 80% of limit)
+      const shouldPrompt = usage >= (limit * 0.8) && !session.featureUsage[0]?.upgradePrompted;
+
+      if (shouldPrompt) {
+        await this.prismaService.featureUsage.update({
+          where: { id: session.featureUsage[0].id },
+          data: {
+            upgradePrompted: true,
+            upgradePromptedAt: new Date(),
+          },
+        });
+      }
+
+      return {
+        withinLimits,
+        currentUsage: usage,
+        limit,
+        upgradePrompted: shouldPrompt,
+      };
+    } catch (error) {
+      this.logger.error(`Failed to check demo limits: ${error.message}`);
+      return { withinLimits: true, currentUsage: 0, limit: 0 };
+    }
+  }
+
+  /**
+   * Check feature gate access for demo users
+   */
+  async checkFeatureGateAccess(
+    sessionId: string,
+    featureName: string,
+    _featureCategory: string
+  ): Promise<FeatureGateResult> {
+    try {
+      // For now, allow all access for demo users with soft limits
+      // This can be enhanced later with actual database checks
+
+      const limits = await this.checkDemoLimits(sessionId, featureName);
+
+      if (!limits.withinLimits) {
+        return {
+          allowed: true, // Soft limit - still allow access
+          reason: 'Demo limit reached',
+          upgradeRequired: false,
+          currentUsage: limits.currentUsage,
+          limit: limits.limit,
+          upgradePrompt: {
+            title: 'Demo Limit Reached',
+            message: `You've reached the demo limit for ${featureName}. Upgrade to continue with unlimited access.`,
+            ctaText: 'Upgrade Now',
+            ctaUrl: '/upgrade',
+            urgency: 'high',
+          },
+        };
+      }
+
+      return {
+        allowed: true,
+        reason: 'Demo access granted',
+        currentUsage: limits.currentUsage,
+        limit: limits.limit,
+      };
+    } catch (error) {
+      this.logger.error(`Failed to check feature gate access: ${error.message}`);
+      // Default to allowing access for demo users
+      return {
+        allowed: true,
+        reason: 'Demo access granted (fallback)',
+      };
+    }
   }
 }

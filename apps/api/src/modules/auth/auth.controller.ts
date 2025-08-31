@@ -1,4 +1,4 @@
-import { Controller, Post, Body, UseGuards, Get, HttpCode, HttpStatus, Req, BadRequestException } from '@nestjs/common';
+import { Controller, Post, Body, UseGuards, Get, HttpCode, HttpStatus, Req, Res, BadRequestException } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiBody } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
 import { LoginDto, RegisterDto, RefreshTokenDto } from './dto';
@@ -6,11 +6,20 @@ import { LocalAuthGuard } from './guards/local-auth.guard';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { Public } from './decorators/public.decorator';
 import { CurrentUser } from './decorators/current-user.decorator';
+import { SessionService } from './services/session.service';
+import { WSTicketService } from './services/ws-ticket.service';
+import { TokenService } from './services/token.service';
+import type { Request, Response } from 'express';
 
 @ApiTags('auth')
 @Controller('auth')
 export class AuthController {
-  constructor(private authService: AuthService) { }
+  constructor(
+    private readonly authService: AuthService,
+    private readonly sessionService: SessionService,
+    private readonly wsTicketService: WSTicketService,
+    private readonly tokenService: TokenService,
+  ) { }
 
   @Public()
   @Post('login')
@@ -190,6 +199,155 @@ export class AuthController {
       userId: user.userId,
       organizationId: user.organizationId,
       organizationSlug: user.organizationSlug,
+    };
+  }
+
+  // ============================================================================
+  // SESSION-BASED AUTHENTICATION ENDPOINTS
+  // ============================================================================
+
+  @Get('.well-known/jwks.json')
+  @Public()
+  @ApiOperation({ summary: 'Get JSON Web Key Set for token verification' })
+  @ApiResponse({ status: 200, description: 'JWKS retrieved successfully' })
+  async getJWKS() {
+    return this.tokenService.getJWKS();
+  }
+
+  @Post('session/login')
+  @Public()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Login with session-based authentication' })
+  @ApiResponse({ status: 200, description: 'Login successful, session cookie set' })
+  @ApiResponse({ status: 401, description: 'Invalid credentials' })
+  async sessionLogin(
+    @Body() loginDto: LoginDto,
+    @Req() req: Request,
+    @Res() res: Response,
+  ) {
+    // Authenticate user
+    const authResult = await this.authService.login(loginDto);
+
+    // Create session
+    const session = await this.sessionService.createSession({
+      userId: authResult.user.id,
+      orgId: authResult.user.organizationId,
+      orgSlug: authResult.organization.slug,
+      roleIds: [], // Will be populated from RBAC
+      permissions: [], // Will be populated from RBAC
+      ua: req.headers['user-agent'],
+      ip: req.ip,
+      sessionType: 'user',
+    });
+
+    // Set session cookie
+    res.setHeader('Set-Cookie', this.sessionService.createSessionCookie(session.sid));
+
+    // Return user info (no tokens)
+    res.json({
+      success: true,
+      user: authResult.user,
+      organization: authResult.organization,
+      sessionId: session.sid,
+    });
+  }
+
+  @Post('session/logout')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Logout and invalidate session' })
+  @ApiResponse({ status: 200, description: 'Logout successful' })
+  async sessionLogout(@Req() req: Request, @Res() res: Response) {
+    const sessionId = this.sessionService.parseSessionCookie(req.headers.cookie || '');
+
+    if (sessionId) {
+      await this.sessionService.invalidateSession(sessionId);
+    }
+
+    // Clear session cookie
+    const cookieName = process.env.AUTH_COOKIE_NAME || '__Host-axon.sid';
+    res.setHeader('Set-Cookie', `${cookieName}=; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=0`);
+    res.json({ success: true, message: 'Logged out successfully' });
+  }
+
+  @Post('ws-ticket')
+  @ApiOperation({ summary: 'Get WebSocket authentication ticket' })
+  @ApiResponse({ status: 200, description: 'WebSocket ticket issued' })
+  @ApiResponse({ status: 401, description: 'No valid session' })
+  async getWSTicket(@Req() req: Request) {
+    const sessionId = this.sessionService.parseSessionCookie(req.headers.cookie || '');
+
+    if (!sessionId) {
+      return { success: false, error: 'NO_SESSION' };
+    }
+
+    const sessionValidation = await this.sessionService.validateSession(sessionId);
+    if (!sessionValidation.valid || !sessionValidation.session) {
+      return { success: false, error: 'INVALID_SESSION' };
+    }
+
+    const session = sessionValidation.session;
+
+    // Issue WebSocket ticket
+    const ticket = await this.wsTicketService.issueTicket({
+      userId: session.userId,
+      orgId: session.orgId,
+      orgSlug: session.orgSlug,
+      roleIds: session.roleIds,
+      permissions: session.permissions,
+      pv: session.pv,
+      ua: req.headers['user-agent'],
+      ip: req.ip,
+      isDemo: session.isDemo,
+      sessionId: session.sid,
+    });
+
+    const ttlSeconds = parseInt(process.env.WS_TICKET_TTL_SEC || '60', 10);
+
+    return {
+      success: true,
+      ticket: ticket.tid,
+      expiresIn: ttlSeconds,
+      expiresAt: new Date(ticket.expiresAt).toISOString(),
+    };
+  }
+
+  @Post('token/exchange')
+  @ApiOperation({ summary: 'Exchange session for internal access token' })
+  @ApiResponse({ status: 200, description: 'Access token issued' })
+  @ApiResponse({ status: 401, description: 'No valid session' })
+  async exchangeToken(@Req() req: Request) {
+    const sessionId = this.sessionService.parseSessionCookie(req.headers.cookie || '');
+
+    if (!sessionId) {
+      return { success: false, error: 'NO_SESSION' };
+    }
+
+    const sessionValidation = await this.sessionService.validateSession(sessionId);
+    if (!sessionValidation.valid || !sessionValidation.session) {
+      return { success: false, error: 'INVALID_SESSION' };
+    }
+
+    const session = sessionValidation.session;
+
+    // Create internal access token
+    const accessToken = await this.tokenService.signAccessToken({
+      sub: session.userId,
+      org: session.orgId,
+      orgSlug: session.orgSlug,
+      role_ids: session.roleIds,
+      permissions: session.permissions,
+      pv: session.pv,
+      sessionId: session.sid,
+      isDemo: session.isDemo,
+    });
+
+    const ttl = process.env.ACCESS_TTL || '15m';
+
+    return {
+      success: true,
+      accessToken,
+      expiresIn: ttl,
+      tokenType: 'Bearer',
     };
   }
 }

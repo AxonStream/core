@@ -13,6 +13,35 @@
 export { AxonPulsClient } from './core/client';
 export type { AxonPulsClientConfig, AxonPulsEvent, SubscribeOptions, PublishOptions } from './core/client';
 
+// SDK Modules
+export { OrganizationClient } from './core/organization';
+export { HealthClient } from './core/health';
+export { AuthClient } from './core/auth';
+export { DemoClient } from './core/demo';
+export { AnalyticsClient } from './core/analytics';
+export { RBACClient } from './core/rbac';
+export { ErrorFactory, ErrorHandler } from './core/errors';
+export type {
+  Organization,
+  OrganizationSettings,
+  OrganizationLimits,
+  OrganizationMember,
+  CreateOrganizationRequest,
+  UpdateOrganizationRequest,
+  InviteMemberRequest,
+  OrganizationUsage
+} from './core/organization';
+export type {
+  HealthResponse,
+  HealthCheck,
+  ServiceHealth,
+  PerformanceMetrics,
+  WebSocketHealthResponse,
+  ReadinessResponse,
+  LivenessResponse,
+  SystemMetrics
+} from './core/health';
+
 // 🎯 MAGIC FACTORY FUNCTIONS - Zero-friction onboarding
 export { createAxonPulsClient, createTrialClient, createDemoClient, createMagicClient, createZeroConfigClient } from './factory';
 

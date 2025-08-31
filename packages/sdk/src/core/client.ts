@@ -10,6 +10,12 @@ import {
     generateUUID,
 } from './contracts';
 import { EventEmitter, type EventMap, type DefaultEvents, type EventListener } from './event-emitter';
+import { OrganizationClient } from './organization';
+import { HealthClient } from './health';
+import { AuthClient } from './auth';
+import { DemoClient } from './demo';
+import { AnalyticsClient } from './analytics';
+import { RBACClient } from './rbac';
 
 
 
@@ -99,6 +105,14 @@ export class AxonPulsClient extends EventEmitter {
     // Token refresh
     private tokenRefreshTimeout: ReturnType<typeof setTimeout> | null = null;
     private tokenProvider?: () => Promise<string>;
+
+    // SDK Client Modules
+    public readonly organization: OrganizationClient;
+    public readonly health: HealthClient;
+    public readonly auth: AuthClient;
+    public readonly demo: DemoClient;
+    public readonly analytics: AnalyticsClient;
+    public readonly rbac: RBACClient;
 
     // Limits
     private static readonly MAX_PAYLOAD_BYTES = 1048576; // 1MB
@@ -201,6 +215,17 @@ export class AxonPulsClient extends EventEmitter {
         if (this.config.debug) {
             console.log(`AxonPuls client initialized for org: ${this.orgId}, user: ${this.userId}`);
         }
+
+        // Initialize SDK client modules
+        const apiClient = this.createApiClient();
+        const apiConfig = { baseURL: this.getApiBaseUrl() };
+
+        this.organization = new OrganizationClient(apiClient, apiConfig);
+        this.health = new HealthClient(apiClient, apiConfig);
+        this.auth = new AuthClient(apiClient, apiConfig);
+        this.demo = new DemoClient(apiClient, apiConfig);
+        this.analytics = new AnalyticsClient(apiClient, apiConfig);
+        this.rbac = new RBACClient(apiClient, apiConfig);
     }
 
     /**
@@ -1118,6 +1143,114 @@ export class AxonPulsClient extends EventEmitter {
         } catch {
             // ignore decode failures
         }
+    }
+
+    /**
+     * Get API base URL from WebSocket URL
+     */
+    private getApiBaseUrl(): string {
+        return this.config.url.replace('ws://', 'http://').replace('wss://', 'https://');
+    }
+
+    /**
+     * Create API client for HTTP requests
+     */
+    private createApiClient(): any {
+        const baseURL = this.getApiBaseUrl();
+
+        return {
+            get: async (url: string, config?: any) => {
+                const response = await fetch(`${baseURL}${url}${this.buildQueryString(config?.params)}`, {
+                    method: 'GET',
+                    headers: this.createApiHeaders(config?.headers),
+                });
+                return this.handleApiResponse(response);
+            },
+            post: async (url: string, data?: any, config?: any) => {
+                const response = await fetch(`${baseURL}${url}`, {
+                    method: 'POST',
+                    headers: this.createApiHeaders(config?.headers),
+                    body: data ? JSON.stringify(data) : undefined,
+                });
+                return this.handleApiResponse(response);
+            },
+            put: async (url: string, data?: any, config?: any) => {
+                const response = await fetch(`${baseURL}${url}`, {
+                    method: 'PUT',
+                    headers: this.createApiHeaders(config?.headers),
+                    body: data ? JSON.stringify(data) : undefined,
+                });
+                return this.handleApiResponse(response);
+            },
+            patch: async (url: string, data?: any, config?: any) => {
+                const response = await fetch(`${baseURL}${url}`, {
+                    method: 'PATCH',
+                    headers: this.createApiHeaders(config?.headers),
+                    body: data ? JSON.stringify(data) : undefined,
+                });
+                return this.handleApiResponse(response);
+            },
+            delete: async (url: string, config?: any) => {
+                const response = await fetch(`${baseURL}${url}`, {
+                    method: 'DELETE',
+                    headers: this.createApiHeaders(config?.headers),
+                });
+                return this.handleApiResponse(response);
+            },
+        };
+    }
+
+    /**
+     * Create headers for API requests
+     */
+    private createApiHeaders(additionalHeaders?: Record<string, string>): Record<string, string> {
+        const headers: Record<string, string> = {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+        };
+
+        // Add authentication
+        if (this.config.token) {
+            headers['Authorization'] = `Bearer ${this.config.token}`;
+        } else if (this.config.apiKey) {
+            headers['X-API-Key'] = this.config.apiKey;
+            if (this.config.org) {
+                headers['X-Organization'] = this.config.org;
+            }
+        }
+
+        return { ...headers, ...additionalHeaders };
+    }
+
+    /**
+     * Handle API response
+     */
+    private async handleApiResponse(response: Response): Promise<any> {
+        const data = await response.json().catch(() => ({}));
+
+        return {
+            data,
+            status: response.status,
+            statusText: response.statusText,
+            headers: Object.fromEntries(response.headers.entries()),
+        };
+    }
+
+    /**
+     * Build query string from parameters
+     */
+    private buildQueryString(params?: Record<string, any>): string {
+        if (!params) return '';
+
+        const searchParams = new URLSearchParams();
+        Object.entries(params).forEach(([key, value]) => {
+            if (value !== undefined && value !== null) {
+                searchParams.append(key, String(value));
+            }
+        });
+
+        const queryString = searchParams.toString();
+        return queryString ? `?${queryString}` : '';
     }
 }
 

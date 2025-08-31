@@ -13,12 +13,14 @@ import { DemoController } from './demo.controller';
 import { DemoService } from './demo.service';
 import { PrismaModule } from '../../common/modules/prisma.module';
 import { TenantModule } from '../../common/modules/tenant.module';
+import { AuthModule } from '../auth/auth.module';
 
 @Module({
   imports: [
     ConfigModule,
     PrismaModule,
     TenantModule,
+    AuthModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => {
@@ -29,7 +31,7 @@ import { TenantModule } from '../../common/modules/tenant.module';
         // Configure based on algorithm
         const config: any = {
           signOptions: {
-            expiresIn: '2h', // Demo tokens expire in 2 hours
+            expiresIn: configService.get<string>('auth.jwt.expiresIn'),
             issuer: configService.get<string>('auth.jwt.issuer'),
             audience: configService.get<string>('auth.jwt.audience'),
             algorithm: algorithm || 'HS256',
